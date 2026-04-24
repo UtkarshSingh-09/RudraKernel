@@ -10,3 +10,4 @@
 | 07 | Pathogen Role + R2/R3 | Utkarsh | ✅ | PASS | 2026-04-24 |
 | 08 | R4 Trust Calibration + Reward Hacking Tests | Utkarsh | ✅ | PASS | 2026-04-24 |
 | 9 | Tiered Curriculum Scheduler | AI Agent | ✅ | PASS | 2026-04-24 |
+| 10 | Trust Poisoning Strategy | Utkarsh | ✅ | PASS | 2026-04-24 |

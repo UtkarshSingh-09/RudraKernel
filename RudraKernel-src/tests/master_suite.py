@@ -10,3 +10,4 @@ from tests.step_tests.step_06_trust_test import *  # noqa: F401,F403
 from tests.step_tests.step_07_pathogen_test import *  # noqa: F401,F403
 from tests.step_tests.step_08_r4_hacking_test import *  # noqa: F401,F403
 from tests.step_tests.step_09_curriculum_test import *  # noqa: F401,F403
+from tests.step_tests.step_10_trust_poisoning_test import *  # noqa: F401,F403
