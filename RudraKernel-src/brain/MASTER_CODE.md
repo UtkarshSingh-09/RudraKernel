@@ -3364,3 +3364,558 @@ def test_confidence_calibrator_mean_r5() -> None:
     assert cal.mean_r5() == 0.0
 
 ```
+
+## tests/step_tests/step_13_cascade_test.py (last modified: 2026-04-24T19:23:25+00:00)
+```python
+"""Gate tests for Step 13 — Epistemic Cascade Failures."""
+
+from __future__ import annotations
+
+from siege_env.mechanics.cascade import EpistemicCascadeEngine
+from siege_env.models.actions import DiagnoseArgs, SIEGEAction
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_cascade_engine_triggered_for_high_herding() -> None:
+    engine = EpistemicCascadeEngine(trigger_threshold=0.8, min_agents=4)
+    snapshot = engine.evaluate([0.91, 0.88, 0.85, 0.82, 0.3])
+    assert snapshot.triggered is True
+
+
+def test_cascade_engine_not_triggered_for_sparse_confidence() -> None:
+    engine = EpistemicCascadeEngine(trigger_threshold=0.8, min_agents=4)
+    snapshot = engine.evaluate([0.9, 0.1, 0.4, 0.2, 0.5])
+    assert snapshot.triggered is False
+
+
+def test_environment_info_contains_cascade_block() -> None:
+    env = SIEGEEnvironment(seed=11)
+    env.reset()
+    state = env.state()
+    action = SIEGEAction(
+        tool_name="diagnose",
+        arguments=DiagnoseArgs(
+            root_cause=state.ground_truth_root_cause,
+            confidence=0.8,
+            evidence=["signal"],
+        ),
+    )
+    _, _, _, info = env.step(action)
+    assert "cascade" in info
+    assert {"mean_confidence", "herd_strength", "triggered"}.issubset(info["cascade"].keys())
+
+
+def test_environment_observation_contains_cascade_metadata() -> None:
+    env = SIEGEEnvironment(seed=17)
+    obs = env.reset()
+    assert "cascade" in obs.incident_dashboard
+```
+
+## tests/step_tests/step_14_templates_expansion_test.py (last modified: 2026-04-24T19:34:48+00:00)
+```python
+"""Gate tests for Step 14 — Incident template expansion to 20."""
+
+from __future__ import annotations
+
+import pytest
+
+from siege_env.incidents.loader import load_templates
+
+
+EXPECTED_IDS = [
+    "gitlab_2017_01_db_recovery",
+    "cloudflare_2019_07_regex_waf",
+    "aws_s3_2017_02_us_east_1",
+    "github_2018_10_network_partition",
+    "google_sre_shakespeare_case",
+    "slack_2021_01_dns_dependency",
+    "meta_2021_10_bgp_withdrawal",
+    "fastly_2021_06_edge_config_bug",
+    "gcp_2020_11_auth_quota_exhaustion",
+    "azure_2023_01_wan_issue",
+    "dropbox_2014_01_auth_bug",
+    "stripe_2019_07_db_failover",
+    "twilio_2023_08_kv_dependency",
+    "atlassian_2022_04_script_failure",
+    "datadog_2021_11_message_bus",
+    "zoom_2020_08_dns_registrar",
+    "shopify_2020_09_kubernetes",
+    "netflix_2012_12_aws_outage",
+    "pagerduty_2023_01_db_migration",
+    "openai_2023_11_capacity_event",
+]
+
+
+@pytest.fixture(scope="module")
+def expanded_templates() -> list[dict[str, object]]:
+    return load_templates(include_step14_expansion=True)
+
+
+def test_step14_total_template_count(expanded_templates: list[dict[str, object]]) -> None:
+    assert len(expanded_templates) == 20
+
+
+@pytest.mark.parametrize("template_id", EXPECTED_IDS)
+def test_step14_template_present_and_valid(
+    template_id: str,
+    expanded_templates: list[dict[str, object]],
+) -> None:
+    by_id = {str(t["id"]): t for t in expanded_templates}
+    assert template_id in by_id
+    template = by_id[template_id]
+    assert str(template["source_url"]).startswith("https://")
+    assert str(template["root_cause"]).strip()
+    assert isinstance(template["observable_signals"], list) and len(template["observable_signals"]) > 0
+    assert isinstance(template["flaw_types"], list) and len(template["flaw_types"]) > 0
+    assert isinstance(template["blast_radius"], list) and len(template["blast_radius"]) > 0
+```
+
+## tests/step_tests/step_15_info_asymmetry_test.py (last modified: 2026-04-24T19:35:50+00:00)
+```python
+"""Gate tests for Step 15 — Information Asymmetry."""
+
+from __future__ import annotations
+
+from siege_env.mechanics.info_asymmetry import (
+    filter_evidence_for_visibility,
+    visibility_for_step,
+)
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_visibility_schedule_for_immune_agent() -> None:
+    assert visibility_for_step(0, "immune") == "metrics_only"
+    assert visibility_for_step(2, "immune") == "traces_only"
+    assert visibility_for_step(4, "immune") == "full"
+
+
+def test_visibility_schedule_for_pathogen_agent() -> None:
+    assert visibility_for_step(0, "pathogen") == "delayed"
+    assert visibility_for_step(5, "pathogen") == "delayed"
+
+
+def test_evidence_filtering_respects_visibility_levels() -> None:
+    evidence = [{"value": "a"}, {"value": "b"}, {"value": "c"}]
+    assert len(filter_evidence_for_visibility(evidence, visibility_level="metrics_only")) == 1
+    assert len(filter_evidence_for_visibility(evidence, visibility_level="traces_only")) == 2
+    assert len(filter_evidence_for_visibility(evidence, visibility_level="full")) == 3
+
+
+def test_environment_observation_contains_visibility_and_filtered_evidence() -> None:
+    env = SIEGEEnvironment(seed=3)
+    obs = env.reset()
+    assert obs.visibility_level in {"metrics_only", "traces_only", "full", "delayed"}
+    assert len(obs.available_evidence) >= 1
+    if obs.visibility_level == "metrics_only":
+        assert len(obs.available_evidence) == 1
+```
+
+## tests/step_tests/step_16_whisper_test.py (last modified: 2026-04-24T19:37:21+00:00)
+```python
+"""Gate tests for Step 16 — Whisper / Private Channels."""
+
+from __future__ import annotations
+
+from siege_env.mechanics.whisper import build_whisper_event
+from siege_env.models.actions import SIEGEAction, WhisperArgs
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_build_whisper_event_contains_expected_fields() -> None:
+    event = build_whisper_event(
+        sender_agent_id=0,
+        target_agent_id=2,
+        message="check replica lag",
+        step_number=1,
+    ).to_dict()
+    assert event["sender_agent_id"] == 0
+    assert event["target_agent_id"] == 2
+    assert event["message"] == "check replica lag"
+
+
+def test_whisper_action_logged_in_step_info_counter() -> None:
+    env = SIEGEEnvironment(seed=5)
+    env.reset()
+    action = SIEGEAction(
+        tool_name="whisper",
+        arguments=WhisperArgs(target_agent_id=2, message="sync privately"),
+    )
+    _, _, _, info = env.step(action)
+    assert info["whispers_logged"] >= 1
+
+
+def test_whisper_log_visible_in_observation() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    action = SIEGEAction(
+        tool_name="whisper",
+        arguments=WhisperArgs(target_agent_id=3, message="private note"),
+    )
+    obs, _, _, _ = env.step(action)
+    assert len(obs.whisper_log) >= 1
+
+
+def test_whisper_inbox_receives_messages_to_seat_agent() -> None:
+    env = SIEGEEnvironment(seed=9)
+    env.reset()
+    action = SIEGEAction(
+        tool_name="whisper",
+        arguments=WhisperArgs(target_agent_id=0, message="for you"),
+    )
+    obs, _, _, _ = env.step(action)
+    assert len(obs.whisper_inbox) >= 1
+```
+
+## tests/step_tests/step_17_red_herrings_r9_test.py (last modified: 2026-04-24T19:39:27+00:00)
+```python
+"""Gate tests for Step 17 — Red Herrings + R9."""
+
+from __future__ import annotations
+
+from siege_env.mechanics.red_herrings import generate_red_herrings
+from siege_env.models.actions import ChallengeArgs, DiagnoseArgs, SIEGEAction
+from siege_env.rewards.r9_correlation import compute_r9_correlation
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_red_herrings_are_deterministic_for_seed_and_step() -> None:
+    a = generate_red_herrings(seed=42, step_number=2)
+    b = generate_red_herrings(seed=42, step_number=2)
+    assert a == b
+
+
+def test_r9_rewards_correct_false_correlation_challenge() -> None:
+    action = SIEGEAction(
+        tool_name="challenge",
+        arguments=ChallengeArgs(
+            target_agent_id=1,
+            claim_id="c1",
+            flaw_type="type1_false_correlation",
+            reasoning="Signal is correlated but not causal.",
+        ),
+    )
+    claims = {"c1": {"root_cause": "wrong_cause"}}
+    assert compute_r9_correlation(action, claims_by_id=claims, ground_truth_root_cause="real_cause") == 1.0
+
+
+def test_r9_zero_for_non_challenge_actions() -> None:
+    action = SIEGEAction(
+        tool_name="diagnose",
+        arguments=DiagnoseArgs(root_cause="x", confidence=0.7, evidence=["e"]),
+    )
+    assert compute_r9_correlation(action, claims_by_id={}, ground_truth_root_cause="x") == 0.0
+
+
+def test_environment_observation_contains_red_herrings() -> None:
+    env = SIEGEEnvironment(seed=21)
+    obs = env.reset()
+    assert len(obs.red_herring_signals) >= 1
+
+
+def test_exploit_always_challenge_wrong_flaw_type_gets_no_r9() -> None:
+    action = SIEGEAction(
+        tool_name="challenge",
+        arguments=ChallengeArgs(
+            target_agent_id=1,
+            claim_id="c2",
+            flaw_type="type3_tunnel_vision",
+            reasoning="Always challenging for reward exploit attempt.",
+        ),
+    )
+    claims = {"c2": {"root_cause": "wrong_cause"}}
+    assert compute_r9_correlation(action, claims_by_id=claims, ground_truth_root_cause="real_cause") == 0.0
+```
+
+## tests/step_tests/step_18_severity_r8_test.py (last modified: 2026-04-24T19:40:39+00:00)
+```python
+"""Gate tests for Step 18 — Severity Escalation + R8."""
+
+from __future__ import annotations
+
+from siege_env.mechanics.severity_escalation import compute_incident_severity
+from siege_env.models.actions import DiagnoseArgs, EscalateArgs, SIEGEAction
+from siege_env.rewards.r8_severity_speed import compute_r8_severity_speed
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_incident_severity_progression_by_step() -> None:
+    assert compute_incident_severity(0) == "warning"
+    assert compute_incident_severity(2) == "critical"
+    assert compute_incident_severity(5) == "outage"
+
+
+def test_r8_rewards_fast_escalation_when_severity_outage() -> None:
+    action = SIEGEAction(
+        tool_name="escalate",
+        arguments=EscalateArgs(concern="major outage", blast_radius_estimate=["db", "api"]),
+    )
+    assert compute_r8_severity_speed(action, incident_severity="outage") == 1.0
+
+
+def test_r8_lower_reward_for_warning_escalation() -> None:
+    action = SIEGEAction(
+        tool_name="escalate",
+        arguments=EscalateArgs(concern="minor signal", blast_radius_estimate=["api"]),
+    )
+    assert compute_r8_severity_speed(action, incident_severity="warning") == 0.2
+
+
+def test_environment_observation_exposes_escalated_severity() -> None:
+    env = SIEGEEnvironment(seed=15)
+    obs = env.reset()
+    assert obs.incident_severity in {"warning", "critical", "outage"}
+    assert "severity_score" in obs.incident_dashboard
+
+
+def test_exploit_always_escalate_not_maximal_in_warning_state() -> None:
+    action = SIEGEAction(
+        tool_name="escalate",
+        arguments=EscalateArgs(concern="always escalate exploit", blast_radius_estimate=["x"]),
+    )
+    reward = compute_r8_severity_speed(action, incident_severity="warning")
+    assert reward < 1.0
+```
+
+## tests/step_tests/step_19_postmortem_r7_test.py (last modified: 2026-04-24T19:41:58+00:00)
+```python
+"""Gate tests for Step 19 — Post-Mortem Generation + R7."""
+
+from __future__ import annotations
+
+from siege_env.models.actions import PostmortemArgs, SIEGEAction, TimelineEvent
+from siege_env.rewards.r7_postmortem import compute_r7_postmortem
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def _postmortem_action(*, root: str, timeline_events: list[str], analysis: str) -> SIEGEAction:
+    return SIEGEAction(
+        tool_name="postmortem",
+        arguments=PostmortemArgs(
+            root_cause=root,
+            timeline=[
+                TimelineEvent(timestamp=f"t{i}", event=ev)
+                for i, ev in enumerate(timeline_events)
+            ],
+            contributing_factors=["factor_a", "factor_b"],
+            misdiagnosis_analysis=analysis,
+        ),
+    )
+
+
+def test_r7_rewards_high_quality_postmortem() -> None:
+    action = _postmortem_action(
+        root="db_timeout",
+        timeline_events=["signal rose", "cache invalidation failed"],
+        analysis="Initial triage over-weighted traffic volume and ignored a lock wait pattern in diagnostics.",
+    )
+    assert compute_r7_postmortem(action, ground_truth_root_cause="db_timeout") >= 0.8
+
+
+def test_r7_is_zero_for_non_postmortem_actions() -> None:
+    env = SIEGEEnvironment(seed=31)
+    env.reset()
+    _, reward, _, _ = env.step({"tool_name": "diagnose", "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]}})
+    assert reward >= 0.0
+
+
+def test_postmortem_flag_in_step_info() -> None:
+    env = SIEGEEnvironment(seed=33)
+    env.reset()
+    action = _postmortem_action(
+        root="any",
+        timeline_events=["a", "b"],
+        analysis="Detailed analysis with enough context to satisfy quality heuristics.",
+    )
+    _, _, _, info = env.step(action)
+    assert info["postmortem_generated"] is True
+
+
+def test_observation_dashboard_carries_last_postmortem() -> None:
+    env = SIEGEEnvironment(seed=35)
+    env.reset()
+    action = _postmortem_action(
+        root="rc",
+        timeline_events=["first", "second"],
+        analysis="Long postmortem narrative connecting false leads to final diagnosis confidence shift.",
+    )
+    obs, _, _, _ = env.step(action)
+    assert "last_postmortem" in obs.incident_dashboard
+
+
+def test_template_parroting_exploit_gets_penalized() -> None:
+    action = _postmortem_action(
+        root="db_timeout",
+        timeline_events=["template text", "template text"],
+        analysis="template text",
+    )
+    assert compute_r7_postmortem(action, ground_truth_root_cause="db_timeout") < 0.8
+```
+
+## tests/step_tests/step_20_league_test.py (last modified: 2026-04-24T19:43:13+00:00)
+```python
+"""Gate tests for Step 20 — Frozen Opponent League."""
+
+from __future__ import annotations
+
+from siege_env.league.opponent_pool import FrozenOpponentPool
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_frozen_pool_sampling_count() -> None:
+    pool = FrozenOpponentPool(seed=1)
+    roster = pool.sample(k=3)
+    assert len(roster) == 3
+
+
+def test_frozen_pool_deterministic_for_seed() -> None:
+    a = [o.opponent_id for o in FrozenOpponentPool(seed=42).sample(k=3)]
+    b = [o.opponent_id for o in FrozenOpponentPool(seed=42).sample(k=3)]
+    assert a == b
+
+
+def test_environment_reset_contains_league_roster() -> None:
+    env = SIEGEEnvironment(seed=2)
+    obs = env.reset()
+    assert "league_roster" in obs.incident_dashboard
+    assert len(obs.incident_dashboard["league_roster"]) == 3
+
+
+def test_league_roster_persists_into_step_observation() -> None:
+    env = SIEGEEnvironment(seed=8)
+    env.reset()
+    obs, _, _, _ = env.step({"tool_name": "diagnose", "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]}})
+    assert "league_roster" in obs.incident_dashboard
+```
+
+## tests/step_tests/step_21_replay_determinism_test.py (last modified: 2026-04-24T19:45:00+00:00)
+```python
+"""Gate tests for Step 21 — Determinism + Replay."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from siege_env.replay.logger import ReplayLogger
+from siege_env.replay.player import replay_file
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def test_replay_logger_round_trip() -> None:
+    path = Path("/tmp/siege_step21_round_trip.jsonl")
+    if path.exists():
+        path.unlink()
+    logger = ReplayLogger(path)
+    logger.append({"step": 1, "tool": "diagnose"})
+    logger.append({"step": 2, "tool": "challenge"})
+    events = logger.read_all()
+    assert len(events) == 2
+
+
+def test_replay_player_reads_logged_events() -> None:
+    path = Path("/tmp/siege_step21_player.jsonl")
+    if path.exists():
+        path.unlink()
+    logger = ReplayLogger(path)
+    logger.append({"step": 1, "tool": "diagnose"})
+    assert len(replay_file(path)) == 1
+
+
+def test_environment_step_info_exposes_replay_path() -> None:
+    env = SIEGEEnvironment(seed=101)
+    env.reset()
+    _, _, _, info = env.step({"tool_name": "diagnose", "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]}})
+    assert "replay_log_path" in info
+```
+
+## tests/step_tests/step_22_heldout_ablation_test.py (last modified: 2026-04-24T19:46:49+00:00)
+```python
+"""Gate tests for Step 22 — Held-Out Eval + Ablation Harness."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+
+from training.ablation import default_ablation_runs
+from training.heldout_split import build_split
+
+
+def test_heldout_split_integrity() -> None:
+    ids = [f"t{i}" for i in range(20)]
+    split = build_split(ids, seed=11, heldout_fraction=0.2)
+    assert len(split["heldout"]) == 4
+    assert len(set(split["train"]).intersection(split["heldout"])) == 0
+
+
+def test_ablation_default_runs_available() -> None:
+    runs = default_ablation_runs()
+    assert len(runs) >= 3
+    assert {r.name for r in runs}.issuperset({"base", "no_curriculum", "no_trust_poisoning"})
+
+
+def test_generate_ablations_script_writes_plan() -> None:
+    root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(["bash", "scripts/generate_ablations.sh"], cwd=root, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + "\n" + result.stderr
+    path = root / "artifacts" / "ablation_plan.json"
+    assert path.exists()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload, list) and len(payload) >= 3
+```
+
+## tests/step_tests/step_23_wandb_plots_test.py (last modified: 2026-04-24T19:47:57+00:00)
+```python
+"""Gate tests for Step 23 — W&B integration + committed plots."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from training.wandb_config import build_init_kwargs, default_settings
+
+
+def test_wandb_init_kwargs_contains_required_fields() -> None:
+    settings = default_settings()
+    kwargs = build_init_kwargs("step23-check")
+    assert kwargs["project"] == settings.project
+    assert kwargs["mode"] == "offline"
+    assert kwargs["name"] == "step23-check"
+
+
+def test_required_plot_artifacts_committed() -> None:
+    root = Path(__file__).resolve().parents[2]
+    plots_dir = root / "docs" / "plots"
+    required = [
+        "arms_race_curve.png",
+        "reward_components.png",
+        "ablation_comparison.png",
+        "generalization_gap.png",
+    ]
+    for file_name in required:
+        path = plots_dir / file_name
+        assert path.exists(), f"Missing plot: {file_name}"
+        assert path.stat().st_size > 0, f"Empty plot: {file_name}"
+```
+
+## tests/step_tests/step_24_gradio_demo_test.py (last modified: 2026-04-24T19:49:22+00:00)
+```python
+"""Gate tests for Step 24 — Gradio money-shot frontend."""
+
+from __future__ import annotations
+
+from frontend.app import build_app, load_demo_episode_text
+
+
+def test_gradio_app_boots_and_has_three_tabs() -> None:
+    app = build_app()
+    assert app is not None
+    assert getattr(app, "rudra_tabs", []) == ["War Room", "Before-After", "Arms Race"]
+
+
+def test_demo_episode_playback_text_is_nonempty() -> None:
+    text = load_demo_episode_text()
+    assert "Agent4" in text
+    assert "YOU" in text
+    assert len(text.splitlines()) >= 3
+```

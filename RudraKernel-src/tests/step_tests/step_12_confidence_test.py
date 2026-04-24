@@ -10,9 +10,8 @@
 
 from __future__ import annotations
 
-from siege_env.models.actions import SIEGEAction, DiagnoseArgs, ChallengeArgs
-from siege_env.rewards.r5_confidence import compute_r5_confidence, ConfidenceCalibrator
-
+from siege_env.models.actions import ChallengeArgs, DiagnoseArgs, SIEGEAction
+from siege_env.rewards.r5_confidence import ConfidenceCalibrator, compute_r5_confidence
 
 _TRUTH = "database_timeout"
 
@@ -20,6 +19,7 @@ _TRUTH = "database_timeout"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _diagnose(root_cause: str, confidence: float) -> SIEGEAction:
     return SIEGEAction(
@@ -48,6 +48,7 @@ def _challenge() -> SIEGEAction:
 # Test 1: Non-diagnose action → R5 = 0
 # ---------------------------------------------------------------------------
 
+
 def test_r5_non_diagnose_is_zero() -> None:
     """Non-diagnose actions must return 0.0."""
     r5 = compute_r5_confidence(_challenge(), _TRUTH)
@@ -58,6 +59,7 @@ def test_r5_non_diagnose_is_zero() -> None:
 # Test 2: Correct + fully confident → R5 = 1.0
 # ---------------------------------------------------------------------------
 
+
 def test_r5_correct_full_confidence_is_one() -> None:
     """Correct diagnosis with confidence=1.0 must return R5=1.0."""
     r5 = compute_r5_confidence(_diagnose(_TRUTH, 1.0), _TRUTH)
@@ -67,6 +69,7 @@ def test_r5_correct_full_confidence_is_one() -> None:
 # ---------------------------------------------------------------------------
 # Test 3: Calibration curve — correct + 0.5 conf gives 0.75
 # ---------------------------------------------------------------------------
+
 
 def test_r5_correct_half_confidence_is_0_75() -> None:
     """Correct diagnosis with confidence=0.5 should give R5=0.75 (not 1.0)."""
@@ -80,6 +83,7 @@ def test_r5_correct_half_confidence_is_0_75() -> None:
 # Test 4: Always-0.5 exploit prevention
 # ---------------------------------------------------------------------------
 
+
 def test_r5_always_half_exploit_blocked() -> None:
     """Wrong diagnosis + confidence=0.5 must score LOWER than correct + confidence=1.0."""
     r5_exploit = compute_r5_confidence(_diagnose("wrong_root_cause", 0.5), _TRUTH)
@@ -90,9 +94,7 @@ def test_r5_always_half_exploit_blocked() -> None:
         f"Wrong+0.5conf should give 0.75 per Brier, got {r5_exploit}"
     )
     # ideal (correct+1.0) → 1.0; exploit cannot reach this ceiling
-    assert r5_exploit < r5_ideal, (
-        f"Always-0.5 exploit ({r5_exploit}) must be < ideal ({r5_ideal})"
-    )
+    assert r5_exploit < r5_ideal, f"Always-0.5 exploit ({r5_exploit}) must be < ideal ({r5_ideal})"
     # Also: wrong + overconfident (conf=1.0) → R5=0.0
     r5_overconfident_wrong = compute_r5_confidence(_diagnose("wrong_root_cause", 1.0), _TRUTH)
     assert r5_overconfident_wrong == 0.0, (
@@ -103,6 +105,7 @@ def test_r5_always_half_exploit_blocked() -> None:
 # ---------------------------------------------------------------------------
 # Test 5: ConfidenceCalibrator mean R5 across multiple actions
 # ---------------------------------------------------------------------------
+
 
 def test_confidence_calibrator_mean_r5() -> None:
     """ConfidenceCalibrator must correctly average R5 across diagnose actions."""

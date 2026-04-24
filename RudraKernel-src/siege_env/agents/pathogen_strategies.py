@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, Literal
 
-
 PathoStage = Literal["build_trust", "strike"]
 
 _BUILD_CONFIDENCE_LOW = 0.85

@@ -7,7 +7,6 @@ from typing import Any
 
 from siege_env.agents.scripted import NPCRole, ScriptedNPCAgent
 
-
 ROLE_SEQUENCE: tuple[NPCRole, ...] = ("lead", "verifier", "contrarian")
 
 
@@ -44,7 +43,9 @@ class NPCPopulation:
             )
         return npc_agents
 
-    def generate_claims(self, template: dict[str, Any], *, step_number: int) -> list[dict[str, Any]]:
+    def generate_claims(
+        self, template: dict[str, Any], *, step_number: int
+    ) -> list[dict[str, Any]]:
         """Generate one claim per scripted NPC in stable agent-id order."""
 
         return [

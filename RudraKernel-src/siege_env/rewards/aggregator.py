@@ -58,6 +58,7 @@ def aggregate_rewards(
         "r6_temporal": r6,
     }
 
+
 # Step 17 append-only extension: include R9 correlation reward
 from siege_env.rewards.r9_correlation import compute_r9_correlation
 
@@ -93,6 +94,7 @@ def aggregate_rewards(
     total = max(0.0, min(1.0, max(base_total, r9)))
     return total, components
 
+
 # Step 18 append-only extension: include R8 severity-speed reward
 from siege_env.rewards.r8_severity_speed import compute_r8_severity_speed
 
@@ -124,6 +126,7 @@ def aggregate_rewards(
     components["r8_severity_speed"] = r8
     total = max(0.0, min(1.0, max(base_total, r8)))
     return total, components
+
 
 # Step 19 append-only extension: include R7 postmortem quality reward
 from siege_env.rewards.r7_postmortem import compute_r7_postmortem

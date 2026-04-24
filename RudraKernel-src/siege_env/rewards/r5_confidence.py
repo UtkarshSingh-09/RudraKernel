@@ -41,7 +41,6 @@ from __future__ import annotations
 
 from siege_env.models import SIEGEAction
 
-
 # ---------------------------------------------------------------------------
 # Stateless per-action R5
 # ---------------------------------------------------------------------------

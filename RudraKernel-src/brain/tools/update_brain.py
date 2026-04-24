@@ -9,7 +9,6 @@ from pathlib import Path
 
 from compile_master_code import main as compile_master
 
-
 ROOT = Path(__file__).resolve().parents[2]
 BRAIN = ROOT / "brain"
 

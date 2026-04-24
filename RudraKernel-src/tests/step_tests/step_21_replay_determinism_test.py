@@ -32,5 +32,10 @@ def test_replay_player_reads_logged_events() -> None:
 def test_environment_step_info_exposes_replay_path() -> None:
     env = SIEGEEnvironment(seed=101)
     env.reset()
-    _, _, _, info = env.step({"tool_name": "diagnose", "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]}})
+    _, _, _, info = env.step(
+        {
+            "tool_name": "diagnose",
+            "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]},
+        }
+    )
     assert "replay_log_path" in info

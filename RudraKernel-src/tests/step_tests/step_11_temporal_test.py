@@ -13,13 +13,13 @@ from __future__ import annotations
 import math
 
 from siege_env.mechanics.temporal_evidence import TemporalEvidenceTracker
-from siege_env.models.actions import SIEGEAction, DiagnoseArgs
+from siege_env.models.actions import DiagnoseArgs, SIEGEAction
 from siege_env.rewards.r6_temporal import compute_r6_temporal
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _diagnose_action(root_cause: str) -> SIEGEAction:
     return SIEGEAction(
@@ -34,6 +34,7 @@ def _diagnose_action(root_cause: str) -> SIEGEAction:
 
 def _non_diagnose_action() -> SIEGEAction:
     from siege_env.models.actions import ChallengeArgs
+
     return SIEGEAction(
         tool_name="challenge",
         arguments=ChallengeArgs(
@@ -49,6 +50,7 @@ def _non_diagnose_action() -> SIEGEAction:
 # Test 1: Evidence observation and freshness at step 0
 # ---------------------------------------------------------------------------
 
+
 def test_freshness_at_observation_step() -> None:
     """Freshness must be 1.0 immediately when a signal is observed."""
     tracker = TemporalEvidenceTracker(decay_rate=0.15)
@@ -60,6 +62,7 @@ def test_freshness_at_observation_step() -> None:
 # ---------------------------------------------------------------------------
 # Test 2: Freshness decays exponentially over steps
 # ---------------------------------------------------------------------------
+
 
 def test_freshness_decays_over_steps() -> None:
     """Freshness should follow exp(-decay * age)."""
@@ -79,6 +82,7 @@ def test_freshness_decays_over_steps() -> None:
 # Test 3: Urgency is floored at min_urgency for old evidence
 # ---------------------------------------------------------------------------
 
+
 def test_urgency_floored_at_min() -> None:
     """After many steps the urgency must not go below min_urgency."""
     min_urgency = 0.10
@@ -92,6 +96,7 @@ def test_urgency_floored_at_min() -> None:
 # ---------------------------------------------------------------------------
 # Test 4: R6 = 0 for wrong answer, R6 = urgency for correct answer
 # ---------------------------------------------------------------------------
+
 
 def test_r6_correct_vs_wrong_diagnose() -> None:
     """R6 is 0 for wrong root cause and equals urgency_multiplier for correct."""
@@ -109,6 +114,7 @@ def test_r6_correct_vs_wrong_diagnose() -> None:
 # ---------------------------------------------------------------------------
 # Test 5: R6 defaults to full score (urgency=1.0) for correct fast diagnosis
 # ---------------------------------------------------------------------------
+
 
 def test_r6_full_score_no_temporal_penalty() -> None:
     """When no urgency multiplier is given, correct diagnose gives R6 = 1.0."""

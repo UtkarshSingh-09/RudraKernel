@@ -28,5 +28,10 @@ def test_environment_reset_contains_league_roster() -> None:
 def test_league_roster_persists_into_step_observation() -> None:
     env = SIEGEEnvironment(seed=8)
     env.reset()
-    obs, _, _, _ = env.step({"tool_name": "diagnose", "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]}})
+    obs, _, _, _ = env.step(
+        {
+            "tool_name": "diagnose",
+            "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]},
+        }
+    )
     assert "league_roster" in obs.incident_dashboard

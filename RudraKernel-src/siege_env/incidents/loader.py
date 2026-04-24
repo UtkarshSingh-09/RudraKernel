@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 REQUIRED_TEMPLATE_KEYS = (
     "id",
     "source_url",
@@ -27,7 +26,9 @@ def _validate_template(raw_template: dict[str, Any], index: int) -> dict[str, An
     template = {key: raw_template[key] for key in REQUIRED_TEMPLATE_KEYS}
     if not isinstance(template["id"], str) or not template["id"].strip():
         raise ValueError(f"Template at index {index} has invalid 'id'.")
-    if not isinstance(template["source_url"], str) or not template["source_url"].startswith("https://"):
+    if not isinstance(template["source_url"], str) or not template["source_url"].startswith(
+        "https://"
+    ):
         raise ValueError(f"Template '{template['id']}' has invalid 'source_url'.")
     if not isinstance(template["root_cause"], str) or not template["root_cause"].strip():
         raise ValueError(f"Template '{template['id']}' has invalid 'root_cause'.")
@@ -37,7 +38,9 @@ def _validate_template(raw_template: dict[str, Any], index: int) -> dict[str, An
         if not isinstance(value, list) or not value:
             raise ValueError(f"Template '{template['id']}' has invalid '{list_key}'.")
         if not all(isinstance(item, str) and item.strip() for item in value):
-            raise ValueError(f"Template '{template['id']}' contains invalid values in '{list_key}'.")
+            raise ValueError(
+                f"Template '{template['id']}' contains invalid values in '{list_key}'."
+            )
 
     return {
         "id": template["id"].strip(),
@@ -59,6 +62,7 @@ def load_templates(path: Path | None = None) -> list[dict[str, Any]]:
 
     return [_validate_template(item, idx) for idx, item in enumerate(raw_payload)]
 
+
 # Step 14 append-only extension: expanded template loading (5 seed + 15 additional)
 EXPANSION_TEMPLATES_PATH = Path(__file__).with_name("templates_expansion_step14.json")
 _ORIGINAL_LOAD_TEMPLATES_STEP14 = load_templates
@@ -77,10 +81,7 @@ def load_templates(
     if not isinstance(raw_expansion, list):
         raise ValueError("Step 14 expansion payload must be a list.")
 
-    validated_expansion = [
-        _validate_template(item, idx)
-        for idx, item in enumerate(raw_expansion)
-    ]
+    validated_expansion = [_validate_template(item, idx) for idx, item in enumerate(raw_expansion)]
 
     merged = seed_templates + validated_expansion
     seen: set[str] = set()

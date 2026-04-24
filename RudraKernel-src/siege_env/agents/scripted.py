@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, Literal
 
-
 NPCRole = Literal["lead", "verifier", "contrarian"]
 ROLE_CONFIDENCE_BOUNDS: dict[NPCRole, tuple[float, float]] = {
     "lead": (0.72, 0.95),
@@ -35,7 +34,9 @@ class ScriptedNPCAgent:
 
         if self.role == "contrarian":
             # Contrarian produces plausible-but-often-wrong diagnoses in early scripted phase.
-            guessed_root_cause = f"suspected_{blast_radius[rng.randrange(len(blast_radius))]}_regression"
+            guessed_root_cause = (
+                f"suspected_{blast_radius[rng.randrange(len(blast_radius))]}_regression"
+            )
         else:
             guessed_root_cause = root_cause
 

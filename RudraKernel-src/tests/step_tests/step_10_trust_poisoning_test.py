@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from siege_env.agents.pathogen_strategies import PathogenStrategy
 
-
 _TEMPLATE: dict = {
     "id": "test_incident",
     "source_url": "https://example.com/incident",
@@ -69,7 +68,7 @@ def test_trust_trajectory_rises_during_phase_1() -> None:
     assert traj[0] == 0.5, "Trajectory should start at initial_trust=0.5"
     for i in range(1, len(traj)):
         assert traj[i] >= traj[i - 1], (
-            f"Trust should not decrease in Phase 1: step {i-1}={traj[i-1]}, step {i}={traj[i]}"
+            f"Trust should not decrease in Phase 1: step {i - 1}={traj[i - 1]}, step {i}={traj[i]}"
         )
     assert traj[-1] > traj[0], "Trust must be higher after Phase 1 than at start"
 

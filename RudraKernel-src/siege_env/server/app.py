@@ -6,7 +6,6 @@ from fastapi import FastAPI
 
 from siege_env.server.siege_environment import SIEGEEnvironment
 
-
 app = FastAPI(title="SIEGE Environment", version="0.1.0")
 env = SIEGEEnvironment(seed=7)
 

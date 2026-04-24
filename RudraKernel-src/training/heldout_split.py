@@ -5,7 +5,9 @@ from __future__ import annotations
 from random import Random
 
 
-def build_split(template_ids: list[str], *, seed: int = 0, heldout_fraction: float = 0.2) -> dict[str, list[str]]:
+def build_split(
+    template_ids: list[str], *, seed: int = 0, heldout_fraction: float = 0.2
+) -> dict[str, list[str]]:
     rng = Random(seed)
     ordered = list(dict.fromkeys(template_ids))
     rng.shuffle(ordered)

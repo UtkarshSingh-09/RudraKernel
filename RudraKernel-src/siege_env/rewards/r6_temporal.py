@@ -48,9 +48,7 @@ def compute_r6_temporal(
         R6 score in [0.0, 1.0].
     """
     if not (0.0 <= urgency_multiplier <= 1.0):
-        raise ValueError(
-            f"urgency_multiplier must be in [0, 1], got {urgency_multiplier}"
-        )
+        raise ValueError(f"urgency_multiplier must be in [0, 1], got {urgency_multiplier}")
 
     if action.tool_name != "diagnose":
         return 0.0

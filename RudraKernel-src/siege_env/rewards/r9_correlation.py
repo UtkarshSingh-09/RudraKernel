@@ -6,7 +6,6 @@ from typing import Any
 
 from siege_env.models import SIEGEAction
 
-
 FALSE_CORRELATION = "type1_false_correlation"
 
 

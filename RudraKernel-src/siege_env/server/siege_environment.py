@@ -17,6 +17,7 @@ from siege_env.rewards.aggregator import aggregate_rewards
 try:
     from openenv import MCPEnvironment
 except ImportError:  # pragma: no cover - fallback for local development.
+
     class MCPEnvironment:  # type: ignore[no-redef]
         """Fallback base when OpenEnv is not installed in local test environments."""
 
@@ -65,7 +66,9 @@ class SIEGEEnvironment(MCPEnvironment):
         }
         return self._build_observation(template=template, action_error=None)
 
-    def step(self, action_payload: SIEGEAction | dict[str, Any]) -> tuple[SIEGEObservation, float, bool, dict[str, Any]]:
+    def step(
+        self, action_payload: SIEGEAction | dict[str, Any]
+    ) -> tuple[SIEGEObservation, float, bool, dict[str, Any]]:
         if self._state is None:
             raise RuntimeError("Environment not initialized. Call reset() before step().")
 
@@ -90,9 +93,7 @@ class SIEGEEnvironment(MCPEnvironment):
             claims_by_id={claim["claim_id"]: claim for claim in self._agent_claims},
             trust_scores={idx: 0.5 for idx in range(1, 8)},
             agent_reliability={
-                int(claim["agent_id"]): (
-                    claim["root_cause"] == self._state.ground_truth_root_cause
-                )
+                int(claim["agent_id"]): (claim["root_cause"] == self._state.ground_truth_root_cause)
                 for claim in self._agent_claims
             },
         )
@@ -126,7 +127,9 @@ class SIEGEEnvironment(MCPEnvironment):
                 return template
         raise RuntimeError(f"Template '{template_id}' not found.")
 
-    def _build_observation(self, *, template: dict[str, Any], action_error: str | None) -> SIEGEObservation:
+    def _build_observation(
+        self, *, template: dict[str, Any], action_error: str | None
+    ) -> SIEGEObservation:
         if self._state is None:
             raise RuntimeError("Environment not initialized.")
 
@@ -137,7 +140,9 @@ class SIEGEEnvironment(MCPEnvironment):
         else:
             severity = "outage"
 
-        visible_signals = template["observable_signals"][: max(1, min(len(template["observable_signals"]), self._state.step_count + 1))]
+        visible_signals = template["observable_signals"][
+            : max(1, min(len(template["observable_signals"]), self._state.step_count + 1))
+        ]
         available_evidence = [{"type": "signal", "value": signal} for signal in visible_signals]
         active_status = "resolved" if self._done else "active"
 
@@ -168,6 +173,7 @@ class SIEGEEnvironment(MCPEnvironment):
             seat_agent_id=0,
             action_error=action_error,
         )
+
 
 # Step 13 append-only integration: epistemic cascade metadata
 from siege_env.mechanics.cascade import EpistemicCascadeEngine
@@ -338,7 +344,9 @@ def _build_observation_with_severity(self: SIEGEEnvironment, *, template, action
     obs = _ORIG_BUILD_OBS_STEP18(self, template=template, action_error=action_error)
     severity = compute_incident_severity(obs.step_number)
     obs.incident_severity = severity
-    obs.incident_dashboard["severity_score"] = {"warning": 0.3, "critical": 0.7, "outage": 1.0}[severity]
+    obs.incident_dashboard["severity_score"] = {"warning": 0.3, "critical": 0.7, "outage": 1.0}[
+        severity
+    ]
     return obs
 
 
@@ -413,8 +421,7 @@ def _reset_with_league(self: SIEGEEnvironment):
         self._opponent_pool = FrozenOpponentPool(seed=getattr(self, "_seed", 0))
     roster = self._opponent_pool.sample(k=3)
     self._league_roster = [
-        {"opponent_id": r.opponent_id, "policy_tag": r.policy_tag, "tier": r.tier}
-        for r in roster
+        {"opponent_id": r.opponent_id, "policy_tag": r.policy_tag, "tier": r.tier} for r in roster
     ]
     obs.incident_dashboard["league_roster"] = list(self._league_roster)
     return obs
@@ -432,6 +439,7 @@ SIEGEEnvironment._build_observation = _build_observation_with_league
 
 # Step 21 append-only integration: deterministic replay event logging
 from pathlib import Path
+
 from siege_env.replay.logger import ReplayLogger
 
 _ORIG_STEP_STEP21 = SIEGEEnvironment.step
@@ -446,7 +454,9 @@ def _step_with_replay_logging(self: SIEGEEnvironment, action_payload):
     self._replay_logger.append(
         {
             "step": obs.step_number,
-            "tool": action_payload.get("tool_name") if isinstance(action_payload, dict) else getattr(action_payload, "tool_name", "unknown"),
+            "tool": action_payload.get("tool_name")
+            if isinstance(action_payload, dict)
+            else getattr(action_payload, "tool_name", "unknown"),
             "reward": reward,
             "done": done,
         }

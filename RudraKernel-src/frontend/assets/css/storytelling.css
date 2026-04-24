@@ -1,9 +1,47 @@
 :root {
-  --rk-bg: #f3f7fb;
+  --rk-bg: #edf4f7;
   --rk-panel: #ffffff;
-  --rk-ink: #0f2233;
-  --rk-accent: #0078a8;
+  --rk-ink: #0b2538;
+  --rk-accent: #0f7d78;
+  --rk-accent-soft: #d9f2ef;
+  --rk-warn: #bc4308;
 }
-body { background: linear-gradient(120deg, #e7f3ff, #f8fbff); }
-.rk-title { color: var(--rk-ink); font-weight: 700; letter-spacing: .02em; }
-.rk-note { color: #2b4f68; }
+body {
+  background:
+    radial-gradient(circle at 10% 20%, #d8eef7 0%, transparent 40%),
+    radial-gradient(circle at 90% 0%, #d9f2ef 0%, transparent 35%),
+    linear-gradient(120deg, #e8f3f8, #f5f9fb);
+  color: var(--rk-ink);
+}
+.gradio-container {
+  max-width: 1200px !important;
+  margin: 0 auto;
+}
+.rk-title {
+  color: var(--rk-ink);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.rk-note {
+  color: #24475e;
+  line-height: 1.45;
+}
+.rk-note table {
+  background: var(--rk-panel);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.rk-note th {
+  background: #f1f8fb;
+}
+button.primary {
+  background: linear-gradient(90deg, var(--rk-accent), #1d8f88) !important;
+  border: 0 !important;
+}
+button.primary:hover {
+  filter: brightness(0.96);
+}
+.rk-warning {
+  color: var(--rk-warn);
+  font-weight: 600;
+}

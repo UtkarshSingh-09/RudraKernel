@@ -13,7 +13,7 @@ Tier 3 — Expert:    3 pathogens, high noise,    4 red herrings, 30 max steps
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 

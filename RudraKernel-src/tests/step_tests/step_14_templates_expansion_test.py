@@ -6,7 +6,6 @@ import pytest
 
 from siege_env.incidents.loader import load_templates
 
-
 EXPECTED_IDS = [
     "gitlab_2017_01_db_recovery",
     "cloudflare_2019_07_regex_waf",
@@ -50,6 +49,8 @@ def test_step14_template_present_and_valid(
     template = by_id[template_id]
     assert str(template["source_url"]).startswith("https://")
     assert str(template["root_cause"]).strip()
-    assert isinstance(template["observable_signals"], list) and len(template["observable_signals"]) > 0
+    assert (
+        isinstance(template["observable_signals"], list) and len(template["observable_signals"]) > 0
+    )
     assert isinstance(template["flaw_types"], list) and len(template["flaw_types"]) > 0
     assert isinstance(template["blast_radius"], list) and len(template["blast_radius"]) > 0

@@ -6,7 +6,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-
 PLOTS = [
     "arms_race_curve.png",
     "reward_components.png",

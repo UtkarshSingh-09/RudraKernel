@@ -36,14 +36,20 @@ def test_scripted_agent_generate_claim_is_deterministic() -> None:
 
 def test_claim_contains_expected_keys() -> None:
     template = _template()
-    claim = ScriptedNPCAgent(agent_id=4, role="lead", seed=99).generate_claim(template, step_number=1)
-    assert {"agent_id", "claim_id", "root_cause", "confidence", "role", "evidence"} <= set(claim.keys())
+    claim = ScriptedNPCAgent(agent_id=4, role="lead", seed=99).generate_claim(
+        template, step_number=1
+    )
+    assert {"agent_id", "claim_id", "root_cause", "confidence", "role", "evidence"} <= set(
+        claim.keys()
+    )
 
 
 def test_role_confidence_respects_role_bounds() -> None:
     template = _template()
     for role, bounds in ROLE_CONFIDENCE_BOUNDS.items():
-        claim = ScriptedNPCAgent(agent_id=2, role=role, seed=7).generate_claim(template, step_number=1)
+        claim = ScriptedNPCAgent(agent_id=2, role=role, seed=7).generate_claim(
+            template, step_number=1
+        )
         lower, upper = bounds
         assert lower <= claim["confidence"] <= upper
 

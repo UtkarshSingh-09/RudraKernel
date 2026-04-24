@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from siege_env.mechanics.severity_escalation import compute_incident_severity
-from siege_env.models.actions import DiagnoseArgs, EscalateArgs, SIEGEAction
+from siege_env.models.actions import EscalateArgs, SIEGEAction
 from siege_env.rewards.r8_severity_speed import compute_r8_severity_speed
 from siege_env.server.siege_environment import SIEGEEnvironment
 

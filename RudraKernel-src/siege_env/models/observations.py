@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass
 from math import isfinite
 from typing import Any, Literal, Mapping
 
-
 Role = Literal["immune", "pathogen"]
 VisibilityLevel = Literal["metrics_only", "traces_only", "full", "delayed"]
 IncidentSeverity = Literal["warning", "critical", "outage"]
@@ -65,9 +64,7 @@ class SIEGEObservation:
         if self.your_role not in _ALLOWED_ROLES:
             raise ValueError(f"your_role must be one of {_ALLOWED_ROLES}.")
         if self.visibility_level not in _ALLOWED_VISIBILITY_LEVELS:
-            raise ValueError(
-                f"visibility_level must be one of {_ALLOWED_VISIBILITY_LEVELS}."
-            )
+            raise ValueError(f"visibility_level must be one of {_ALLOWED_VISIBILITY_LEVELS}.")
         if self.incident_severity not in _ALLOWED_SEVERITIES:
             raise ValueError(f"incident_severity must be one of {_ALLOWED_SEVERITIES}.")
         if self.seat_agent_id < 0 or self.seat_agent_id > 7:

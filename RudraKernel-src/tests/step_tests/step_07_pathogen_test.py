@@ -78,9 +78,13 @@ def test_r2_zero_for_immune_wrong_diagnosis() -> None:
 def test_r3_positive_for_immune_challenging_incorrect_claim() -> None:
     env, obs = _env_with_role("immune")
     incorrect_claim = next(
-        claim for claim in obs.agent_claims if claim["root_cause"] != env.state().ground_truth_root_cause
+        claim
+        for claim in obs.agent_claims
+        if claim["root_cause"] != env.state().ground_truth_root_cause
     )
-    _, reward, _, info = env.step(_challenge(incorrect_claim["claim_id"], incorrect_claim["agent_id"]))
+    _, reward, _, info = env.step(
+        _challenge(incorrect_claim["claim_id"], incorrect_claim["agent_id"])
+    )
     assert info["reward_components"]["r3_detection"] > 0.0
     assert reward >= info["reward_components"]["r3_detection"]
 
@@ -88,7 +92,9 @@ def test_r3_positive_for_immune_challenging_incorrect_claim() -> None:
 def test_r3_zero_for_immune_challenging_correct_claim() -> None:
     env, obs = _env_with_role("immune")
     correct_claim = next(
-        claim for claim in obs.agent_claims if claim["root_cause"] == env.state().ground_truth_root_cause
+        claim
+        for claim in obs.agent_claims
+        if claim["root_cause"] == env.state().ground_truth_root_cause
     )
     _, _, _, info = env.step(_challenge(correct_claim["claim_id"], correct_claim["agent_id"]))
     assert info["reward_components"]["r3_detection"] == 0.0

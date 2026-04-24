@@ -6,7 +6,6 @@ from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-
 ToolName: TypeAlias = Literal[
     "diagnose",
     "challenge",
@@ -26,7 +25,9 @@ ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=10, max_length=1500)]
 MessageText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 ClaimId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
-EvidenceItem = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+EvidenceItem = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
 
 
 class SIEGEBaseModel(BaseModel):

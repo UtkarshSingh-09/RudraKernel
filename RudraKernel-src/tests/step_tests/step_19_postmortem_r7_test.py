@@ -13,8 +13,7 @@ def _postmortem_action(*, root: str, timeline_events: list[str], analysis: str) 
         arguments=PostmortemArgs(
             root_cause=root,
             timeline=[
-                TimelineEvent(timestamp=f"t{i}", event=ev)
-                for i, ev in enumerate(timeline_events)
+                TimelineEvent(timestamp=f"t{i}", event=ev) for i, ev in enumerate(timeline_events)
             ],
             contributing_factors=["factor_a", "factor_b"],
             misdiagnosis_analysis=analysis,
@@ -34,7 +33,12 @@ def test_r7_rewards_high_quality_postmortem() -> None:
 def test_r7_is_zero_for_non_postmortem_actions() -> None:
     env = SIEGEEnvironment(seed=31)
     env.reset()
-    _, reward, _, _ = env.step({"tool_name": "diagnose", "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]}})
+    _, reward, _, _ = env.step(
+        {
+            "tool_name": "diagnose",
+            "arguments": {"root_cause": "x", "confidence": 0.5, "evidence": ["e"]},
+        }
+    )
     assert reward >= 0.0
 
 

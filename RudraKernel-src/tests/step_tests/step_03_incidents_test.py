@@ -3,7 +3,6 @@ from __future__ import annotations
 from siege_env.incidents.generator import generate_variant
 from siege_env.incidents.loader import load_templates
 
-
 REQUIRED_KEYS = {
     "id",
     "source_url",

@@ -25,7 +25,10 @@ def test_r9_rewards_correct_false_correlation_challenge() -> None:
         ),
     )
     claims = {"c1": {"root_cause": "wrong_cause"}}
-    assert compute_r9_correlation(action, claims_by_id=claims, ground_truth_root_cause="real_cause") == 1.0
+    assert (
+        compute_r9_correlation(action, claims_by_id=claims, ground_truth_root_cause="real_cause")
+        == 1.0
+    )
 
 
 def test_r9_zero_for_non_challenge_actions() -> None:
@@ -53,4 +56,7 @@ def test_exploit_always_challenge_wrong_flaw_type_gets_no_r9() -> None:
         ),
     )
     claims = {"c2": {"root_cause": "wrong_cause"}}
-    assert compute_r9_correlation(action, claims_by_id=claims, ground_truth_root_cause="real_cause") == 0.0
+    assert (
+        compute_r9_correlation(action, claims_by_id=claims, ground_truth_root_cause="real_cause")
+        == 0.0
+    )

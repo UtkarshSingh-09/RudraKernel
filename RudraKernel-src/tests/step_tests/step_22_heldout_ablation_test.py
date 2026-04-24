@@ -25,7 +25,13 @@ def test_ablation_default_runs_available() -> None:
 
 def test_generate_ablations_script_writes_plan() -> None:
     root = Path(__file__).resolve().parents[2]
-    result = subprocess.run(["bash", "scripts/generate_ablations.sh"], cwd=root, capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        ["bash", "scripts/generate_ablations.sh"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert result.returncode == 0, result.stdout + "\n" + result.stderr
     path = root / "artifacts" / "ablation_plan.json"
     assert path.exists()

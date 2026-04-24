@@ -19,4 +19,8 @@ class ReplayLogger:
     def read_all(self) -> list[dict[str, Any]]:
         if not self._path.exists():
             return []
-        return [json.loads(line) for line in self._path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [
+            json.loads(line)
+            for line in self._path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]

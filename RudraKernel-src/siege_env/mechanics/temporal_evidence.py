@@ -39,7 +39,6 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-
 _DEFAULT_DECAY_RATE = 0.15
 _DEFAULT_MIN_URGENCY = 0.10
 

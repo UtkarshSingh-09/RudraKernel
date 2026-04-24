@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -56,12 +55,10 @@ def test_update_brain_creates_snapshot() -> None:
         ROOT / "brain" / "CHANGELOG.md": (ROOT / "brain" / "CHANGELOG.md").read_text(
             encoding="utf-8"
         ),
-        ROOT / "brain" / "CONTEXT.md": (ROOT / "brain" / "CONTEXT.md").read_text(
+        ROOT / "brain" / "CONTEXT.md": (ROOT / "brain" / "CONTEXT.md").read_text(encoding="utf-8"),
+        ROOT / "brain" / "ROADMAP_STATUS.md": (ROOT / "brain" / "ROADMAP_STATUS.md").read_text(
             encoding="utf-8"
         ),
-        ROOT / "brain" / "ROADMAP_STATUS.md": (
-            ROOT / "brain" / "ROADMAP_STATUS.md"
-        ).read_text(encoding="utf-8"),
     }
     before = set((ROOT / "brain" / "snapshots").glob("step_00_*.json"))
     try:
