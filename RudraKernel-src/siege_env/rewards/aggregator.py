@@ -124,3 +124,36 @@ def aggregate_rewards(
     components["r8_severity_speed"] = r8
     total = max(0.0, min(1.0, max(base_total, r8)))
     return total, components
+
+# Step 19 append-only extension: include R7 postmortem quality reward
+from siege_env.rewards.r7_postmortem import compute_r7_postmortem
+
+_ORIGINAL_AGGREGATE_REWARDS_STEP19 = aggregate_rewards
+
+
+def aggregate_rewards(
+    action: SIEGEAction,
+    *,
+    ground_truth_root_cause: str,
+    seat_role: str = "immune",
+    claims_by_id: dict[str, dict[str, Any]] | None = None,
+    trust_scores: dict[int, float] | None = None,
+    agent_reliability: dict[int, bool] | None = None,
+    urgency_multiplier: float = 1.0,
+    incident_severity: str = "warning",
+) -> tuple[float, dict[str, Any]]:
+    base_total, components = _ORIGINAL_AGGREGATE_REWARDS_STEP19(
+        action,
+        ground_truth_root_cause=ground_truth_root_cause,
+        seat_role=seat_role,
+        claims_by_id=claims_by_id,
+        trust_scores=trust_scores,
+        agent_reliability=agent_reliability,
+        urgency_multiplier=urgency_multiplier,
+        incident_severity=incident_severity,
+    )
+    r7 = compute_r7_postmortem(action, ground_truth_root_cause=ground_truth_root_cause)
+    components = dict(components)
+    components["r7_postmortem"] = r7
+    total = max(0.0, min(1.0, max(base_total, r7)))
+    return total, components

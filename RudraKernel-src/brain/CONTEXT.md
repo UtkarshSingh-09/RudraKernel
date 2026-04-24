@@ -42,3 +42,9 @@
 - Gate test: PASS (5/5)
 - Master suite: PASS (128 passed, 2 skipped)
 - Status: Severity-aware escalation signals and R8 reward component integrated.
+
+## Step 19 Update (2026-04-24T19:40:35Z)
+- Latest step touched: 19 - Post-Mortem Generation + R7
+- Gate test: PASS (5/5)
+- Master suite: PASS (133 passed, 2 skipped)
+- Status: Postmortem reward and dashboard capture now active.

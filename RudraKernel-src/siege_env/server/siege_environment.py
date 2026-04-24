@@ -344,3 +344,58 @@ def _build_observation_with_severity(self: SIEGEEnvironment, *, template, action
 
 SIEGEEnvironment.step = _step_with_severity_r8
 SIEGEEnvironment._build_observation = _build_observation_with_severity
+
+# Step 19 append-only integration: postmortem capture in step/info and observation metadata
+_ORIG_STEP_STEP19 = SIEGEEnvironment.step
+_ORIG_BUILD_OBS_STEP19 = SIEGEEnvironment._build_observation
+
+
+def _step_with_postmortem_capture(self: SIEGEEnvironment, action_payload):
+    if not hasattr(self, "_last_postmortem"):
+        self._last_postmortem = None
+
+    obs, reward, done, info = _ORIG_STEP_STEP19(self, action_payload)
+
+    try:
+        action = SIEGEAction.model_validate(action_payload)
+    except Exception:  # pragma: no cover
+        action = None
+
+    if action is not None and action.tool_name == "postmortem":
+        self._last_postmortem = {
+            "root_cause": action.arguments.root_cause,
+            "timeline": [
+                {"timestamp": event.timestamp, "event": event.event}
+                for event in action.arguments.timeline
+            ],
+            "contributing_factors": list(action.arguments.contributing_factors),
+            "misdiagnosis_analysis": action.arguments.misdiagnosis_analysis,
+        }
+
+    info = dict(info)
+    info["postmortem_generated"] = self._last_postmortem is not None
+    return obs, reward, done, info
+
+
+def _build_observation_with_postmortem(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP19(self, template=template, action_error=action_error)
+    if hasattr(self, "_last_postmortem") and self._last_postmortem is not None:
+        obs.incident_dashboard["last_postmortem"] = dict(self._last_postmortem)
+    return obs
+
+
+SIEGEEnvironment.step = _step_with_postmortem_capture
+SIEGEEnvironment._build_observation = _build_observation_with_postmortem
+
+# Step 19 append-only fix: sync last_postmortem into the returned step observation
+_ORIG_STEP_STEP19_SYNC = SIEGEEnvironment.step
+
+
+def _step_with_postmortem_synced_observation(self: SIEGEEnvironment, action_payload):
+    obs, reward, done, info = _ORIG_STEP_STEP19_SYNC(self, action_payload)
+    if hasattr(self, "_last_postmortem") and self._last_postmortem is not None:
+        obs.incident_dashboard["last_postmortem"] = dict(self._last_postmortem)
+    return obs, reward, done, info
+
+
+SIEGEEnvironment.step = _step_with_postmortem_synced_observation
