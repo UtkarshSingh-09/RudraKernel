@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from siege_env.agents import NPCPopulation
 from siege_env.incidents import load_templates
 from siege_env.models import SIEGEAction, SIEGEObservation, SIEGEState
 from siege_env.rewards.aggregator import aggregate_rewards
@@ -24,13 +25,21 @@ class SIEGEEnvironment(MCPEnvironment):
     """Single-seat SIEGE environment with minimal R1 reward loop."""
 
     def __init__(self, *, seed: int = 0, max_steps: int = 5) -> None:
+        self._seed = seed
         self._rng = Random(seed)
         self._max_steps = max_steps
         self._templates = load_templates()
         self._state: SIEGEState | None = None
         self._agent_claims: list[dict[str, Any]] = []
+        self._population: NPCPopulation | None = None
+        self._seat_role = "immune"
         self._done = False
-        self._last_reward_components: dict[str, Any] = {"r1_resolution": 0.0}
+        self._last_reward_components: dict[str, Any] = {
+            "r1_resolution": 0.0,
+            "r2_deception": 0.0,
+            "r3_detection": 0.0,
+            "r4_trust_calibration": 0.0,
+        }
 
     def reset(self) -> SIEGEObservation:
         template = self._rng.choice(self._templates)
@@ -43,9 +52,17 @@ class SIEGEEnvironment(MCPEnvironment):
             current_tier=1,
             arms_race_score=0.0,
         )
-        self._agent_claims = []
+        self._seat_role = "pathogen" if self._rng.random() < 0.3 else "immune"
+        population_seed = self._seed + self._rng.randrange(10_000)
+        self._population = NPCPopulation(seed=population_seed, seat_agent_id=0)
+        self._agent_claims = self._population.generate_claims(template, step_number=0)
         self._done = False
-        self._last_reward_components = {"r1_resolution": 0.0}
+        self._last_reward_components = {
+            "r1_resolution": 0.0,
+            "r2_deception": 0.0,
+            "r3_detection": 0.0,
+            "r4_trust_calibration": 0.0,
+        }
         return self._build_observation(template=template, action_error=None)
 
     def step(self, action_payload: SIEGEAction | dict[str, Any]) -> tuple[SIEGEObservation, float, bool, dict[str, Any]]:
@@ -69,23 +86,33 @@ class SIEGEEnvironment(MCPEnvironment):
         reward, components = aggregate_rewards(
             action,
             ground_truth_root_cause=self._state.ground_truth_root_cause,
+            seat_role=self._seat_role,
+            claims_by_id={claim["claim_id"]: claim for claim in self._agent_claims},
+            trust_scores={idx: 0.5 for idx in range(1, 8)},
+            agent_reliability={
+                int(claim["agent_id"]): (
+                    claim["root_cause"] == self._state.ground_truth_root_cause
+                )
+                for claim in self._agent_claims
+            },
         )
         self._last_reward_components = components
 
-        if action.tool_name == "diagnose":
-            self._agent_claims.append(
-                {
-                    "agent_id": 0,
-                    "claim_id": f"claim-{self._state.step_count:03d}",
-                    "root_cause": action.arguments.root_cause,
-                }
+        if self._population is not None:
+            self._agent_claims = self._population.generate_claims(
+                template,
+                step_number=self._state.step_count,
             )
 
         self._done = (action.tool_name == "diagnose" and reward == 1.0) or (
             self._state.step_count >= self._max_steps
         )
         observation = self._build_observation(template=template, action_error=None)
-        info = {"invalid_action": False, "reward_components": components}
+        info = {
+            "invalid_action": False,
+            "reward_components": components,
+            "seat_role": self._seat_role,
+        }
         return observation, reward, self._done, info
 
     def state(self) -> SIEGEState:
@@ -124,7 +151,7 @@ class SIEGEEnvironment(MCPEnvironment):
             coalition_status={"votes_for": [], "votes_against": []},
             step_number=self._state.step_count,
             slo_status={"breached": self._state.step_count >= self._max_steps},
-            your_role="immune",
+            your_role=self._seat_role,
             available_evidence=available_evidence,
             visibility_level="full",
             whisper_inbox=[],

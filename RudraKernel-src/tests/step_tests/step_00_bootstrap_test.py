@@ -89,6 +89,6 @@ def test_update_brain_creates_snapshot() -> None:
     finally:
         after = set((ROOT / "brain" / "snapshots").glob("step_00_*.json"))
         for snapshot_path in after - before:
-            snapshot_path.unlink()
+            snapshot_path.unlink(missing_ok=True)
         for file_path, original_contents in tracked_files.items():
             file_path.write_text(original_contents, encoding="utf-8")

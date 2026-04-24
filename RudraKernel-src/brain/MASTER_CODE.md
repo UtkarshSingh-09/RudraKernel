@@ -1,6 +1,6 @@
-# MASTER CODE - Last Updated: 2026-04-24T17:53:09+00:00
+# MASTER CODE - Last Updated: 2026-04-24T18:20:22+00:00
 
-# Files Tracked: 30
+# Files Tracked: 43
 
 ## siege_env/__init__.py (last modified: 2026-04-24T17:52:44+00:00)
 ```python
@@ -13,14 +13,331 @@ __all__ = ["SIEGEAction", "SIEGEEnvironment", "SIEGEObservation", "SIEGEState"]
 
 ```
 
-## siege_env/agents/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
+## siege_env/agents/__init__.py (last modified: 2026-04-24T17:55:48+00:00)
 ```python
 """Agent population modules."""
+
+from siege_env.agents.population import NPCPopulation
+from siege_env.agents.scripted import ROLE_CONFIDENCE_BOUNDS, ScriptedNPCAgent
+
+__all__ = ["NPCPopulation", "ROLE_CONFIDENCE_BOUNDS", "ScriptedNPCAgent"]
+
 ```
 
-## siege_env/curriculum/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
+## siege_env/agents/population.py (last modified: 2026-04-24T17:56:16+00:00)
+```python
+"""NPC population orchestration for scripted agents."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from siege_env.agents.scripted import NPCRole, ScriptedNPCAgent
+
+
+ROLE_SEQUENCE: tuple[NPCRole, ...] = ("lead", "verifier", "contrarian")
+
+
+@dataclass(slots=True)
+class NPCPopulation:
+    """Build and drive deterministic scripted NPC populations."""
+
+    seed: int
+    seat_agent_id: int
+    total_agents: int = 8
+    agents: list[ScriptedNPCAgent] = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.total_agents < 2:
+            raise ValueError("total_agents must be at least 2.")
+        if self.seat_agent_id < 0 or self.seat_agent_id >= self.total_agents:
+            raise ValueError("seat_agent_id must be within [0, total_agents).")
+        self.agents = self._build_agents()
+
+    def _build_agents(self) -> list[ScriptedNPCAgent]:
+        npc_agents: list[ScriptedNPCAgent] = []
+        role_index = 0
+        for agent_id in range(self.total_agents):
+            if agent_id == self.seat_agent_id:
+                continue
+            role = ROLE_SEQUENCE[role_index % len(ROLE_SEQUENCE)]
+            role_index += 1
+            npc_agents.append(
+                ScriptedNPCAgent(
+                    agent_id=agent_id,
+                    role=role,
+                    seed=self.seed + agent_id * 17,
+                )
+            )
+        return npc_agents
+
+    def generate_claims(self, template: dict[str, Any], *, step_number: int) -> list[dict[str, Any]]:
+        """Generate one claim per scripted NPC in stable agent-id order."""
+
+        return [
+            agent.generate_claim(template, step_number=step_number)
+            for agent in sorted(self.agents, key=lambda npc: npc.agent_id)
+        ]
+
+```
+
+## siege_env/agents/scripted.py (last modified: 2026-04-24T17:55:25+00:00)
+```python
+"""Rule-based scripted NPC policies for Phase A."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from random import Random
+from typing import Any, Literal
+
+
+NPCRole = Literal["lead", "verifier", "contrarian"]
+ROLE_CONFIDENCE_BOUNDS: dict[NPCRole, tuple[float, float]] = {
+    "lead": (0.72, 0.95),
+    "verifier": (0.45, 0.78),
+    "contrarian": (0.25, 0.62),
+}
+
+
+@dataclass(slots=True)
+class ScriptedNPCAgent:
+    """Deterministic, role-conditioned scripted NPC."""
+
+    agent_id: int
+    role: NPCRole
+    seed: int
+
+    def generate_claim(self, template: dict[str, Any], *, step_number: int) -> dict[str, Any]:
+        """Generate a plausible diagnosis claim based on role policy."""
+
+        rng = Random(self.seed + step_number * 101)
+        root_cause = str(template["root_cause"])
+        signals = [str(signal) for signal in template["observable_signals"]]
+        blast_radius = [str(item) for item in template["blast_radius"]]
+        low, high = ROLE_CONFIDENCE_BOUNDS[self.role]
+        confidence = round(rng.uniform(low, high), 2)
+
+        if self.role == "contrarian":
+            # Contrarian produces plausible-but-often-wrong diagnoses in early scripted phase.
+            guessed_root_cause = f"suspected_{blast_radius[rng.randrange(len(blast_radius))]}_regression"
+        else:
+            guessed_root_cause = root_cause
+
+        evidence_size = min(len(signals), 2)
+        evidence = rng.sample(signals, k=evidence_size)
+        claim_id = f"npc-{self.agent_id:02d}-step-{step_number:03d}"
+
+        return {
+            "agent_id": self.agent_id,
+            "claim_id": claim_id,
+            "root_cause": guessed_root_cause,
+            "confidence": confidence,
+            "role": self.role,
+            "evidence": evidence,
+        }
+
+```
+
+## siege_env/curriculum/__init__.py (last modified: 2026-04-24T18:19:16+00:00)
 ```python
 """Curriculum scheduling modules."""
+
+from siege_env.curriculum.tiered_scheduler import TierConfig, TieredScheduler
+
+__all__ = ["TierConfig", "TieredScheduler"]
+```
+
+## siege_env/curriculum/tiered_scheduler.py (last modified: 2026-04-24T18:18:48+00:00)
+```python
+"""Tiered curriculum scheduler for SIEGE adversarial training.
+
+Implements a 3-tier difficulty ladder with automatic escalation and
+de-escalation based on agent rolling win-rate. Enforces the
+'attacker-ahead invariant': the environment is always at least as
+hard as the agent's demonstrated skill level.
+
+Tier 1 — Novice:    1 pathogen,  low noise,    0 red herrings, 20 max steps
+Tier 2 — Advanced:  2 pathogens, medium noise,  2 red herrings, 25 max steps
+Tier 3 — Expert:    3 pathogens, high noise,    4 red herrings, 30 max steps
+"""
+
+from __future__ import annotations
+
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(frozen=True)
+class TierConfig:
+    """Immutable configuration for a single difficulty tier."""
+
+    tier: int
+    num_pathogens: int
+    noise_level: float
+    red_herring_count: int
+    max_steps: int
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return tier parameters as a plain dict for env consumption."""
+        return {
+            "tier": self.tier,
+            "num_pathogens": self.num_pathogens,
+            "noise_level": self.noise_level,
+            "red_herring_count": self.red_herring_count,
+            "max_steps": self.max_steps,
+        }
+
+
+TIER_CONFIGS: dict[int, TierConfig] = {
+    1: TierConfig(
+        tier=1,
+        num_pathogens=1,
+        noise_level=0.1,
+        red_herring_count=0,
+        max_steps=20,
+    ),
+    2: TierConfig(
+        tier=2,
+        num_pathogens=2,
+        noise_level=0.3,
+        red_herring_count=2,
+        max_steps=25,
+    ),
+    3: TierConfig(
+        tier=3,
+        num_pathogens=3,
+        noise_level=0.5,
+        red_herring_count=4,
+        max_steps=30,
+    ),
+}
+
+_MIN_TIER = 1
+_MAX_TIER = 3
+_DEFAULT_WINDOW = 10
+_DEFAULT_ESCALATE_THRESHOLD = 0.70
+_DEFAULT_DEESCALATE_THRESHOLD = 0.30
+_DEFAULT_COOLDOWN = 5
+
+
+class TieredScheduler:
+    """Manages difficulty tier based on agent rolling win-rate.
+
+    Args:
+        window: Number of recent episodes used for the rolling win-rate.
+        escalate_threshold: Win-rate above which the tier increases.
+        deescalate_threshold: Win-rate below which the tier decreases.
+        cooldown: Minimum episodes between any tier change to avoid thrashing.
+        initial_tier: Starting tier (default 1).
+    """
+
+    def __init__(
+        self,
+        *,
+        window: int = _DEFAULT_WINDOW,
+        escalate_threshold: float = _DEFAULT_ESCALATE_THRESHOLD,
+        deescalate_threshold: float = _DEFAULT_DEESCALATE_THRESHOLD,
+        cooldown: int = _DEFAULT_COOLDOWN,
+        initial_tier: int = 1,
+    ) -> None:
+        if not (_MIN_TIER <= initial_tier <= _MAX_TIER):
+            raise ValueError(
+                f"initial_tier must be between {_MIN_TIER} and {_MAX_TIER}, got {initial_tier}"
+            )
+        if not (0.0 < deescalate_threshold < escalate_threshold < 1.0):
+            raise ValueError(
+                "thresholds must satisfy 0 < deescalate_threshold < escalate_threshold < 1"
+            )
+        if window < 1:
+            raise ValueError("window must be >= 1")
+        if cooldown < 0:
+            raise ValueError("cooldown must be >= 0")
+
+        self._tier: int = initial_tier
+        self._window = window
+        self._escalate_threshold = escalate_threshold
+        self._deescalate_threshold = deescalate_threshold
+        self._cooldown = cooldown
+        self._history: deque[bool] = deque(maxlen=window)
+        self._episodes_since_change: int = cooldown  # allow immediate change on first window
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    @property
+    def current_tier(self) -> int:
+        """Current active difficulty tier (1, 2, or 3)."""
+        return self._tier
+
+    @property
+    def config(self) -> TierConfig:
+        """Immutable config for the current tier."""
+        return TIER_CONFIGS[self._tier]
+
+    def record_episode(self, *, won: bool) -> None:
+        """Record the outcome of one episode and update tier if needed.
+
+        Args:
+            won: True if the agent correctly identified the root cause
+                 before timeout (i.e. a 'win' from the agent's perspective).
+        """
+        self._history.append(won)
+        self._episodes_since_change += 1
+
+        if len(self._history) < self._window:
+            return  # not enough data yet
+
+        if self._episodes_since_change < self._cooldown:
+            return  # still in cooldown
+
+        win_rate = self._win_rate()
+        if win_rate >= self._escalate_threshold and self._tier < _MAX_TIER:
+            self._tier += 1
+            self._episodes_since_change = 0
+        elif win_rate <= self._deescalate_threshold and self._tier > _MIN_TIER:
+            self._tier -= 1
+            self._episodes_since_change = 0
+
+    def win_rate(self) -> float:
+        """Current rolling win-rate over the last `window` episodes.
+
+        Returns 0.0 if fewer than `window` episodes have been recorded.
+        """
+        if len(self._history) < self._window:
+            return 0.0
+        return self._win_rate()
+
+    def attacker_ahead(self) -> bool:
+        """Return True when the environment difficulty is ahead of agent skill.
+
+        Defined as: the agent has NOT yet beaten the current tier
+        (i.e. win-rate is below the escalation threshold).
+        This is the invariant SIEGE maintains — the attacker (env) should
+        always be at least as hard as the agent's current mastery level.
+        """
+        if len(self._history) < self._window:
+            return True  # insufficient data → assume attacker ahead
+        return self._win_rate() < self._escalate_threshold
+
+    def reset(self) -> None:
+        """Reset episode history and return to initial tier 1."""
+        self._tier = 1
+        self._history.clear()
+        self._episodes_since_change = self._cooldown
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _win_rate(self) -> float:
+        if not self._history:
+            return 0.0
+        return sum(self._history) / len(self._history)
+
 ```
 
 ## siege_env/incidents/__init__.py (last modified: 2026-04-24T17:23:08+00:00)
@@ -544,18 +861,27 @@ class SIEGEState:
 """Replay logging and playback modules."""
 ```
 
-## siege_env/rewards/__init__.py (last modified: 2026-04-24T17:52:36+00:00)
+## siege_env/rewards/__init__.py (last modified: 2026-04-24T18:14:12+00:00)
 ```python
 """Reward modules and aggregators."""
 
 from siege_env.rewards.aggregator import aggregate_rewards
 from siege_env.rewards.r1_resolution import compute_r1_resolution
+from siege_env.rewards.r2_deception import compute_r2_deception
+from siege_env.rewards.r3_detection import compute_r3_detection
+from siege_env.rewards.r4_trust_calibration import compute_r4_trust_calibration
 
-__all__ = ["aggregate_rewards", "compute_r1_resolution"]
+__all__ = [
+    "aggregate_rewards",
+    "compute_r1_resolution",
+    "compute_r2_deception",
+    "compute_r3_detection",
+    "compute_r4_trust_calibration",
+]
 
 ```
 
-## siege_env/rewards/aggregator.py (last modified: 2026-04-24T17:51:49+00:00)
+## siege_env/rewards/aggregator.py (last modified: 2026-04-24T18:14:06+00:00)
 ```python
 """Reward aggregation scaffold for SIEGE."""
 
@@ -565,18 +891,46 @@ from typing import Any
 
 from siege_env.models import SIEGEAction
 from siege_env.rewards.r1_resolution import compute_r1_resolution
+from siege_env.rewards.r2_deception import compute_r2_deception
+from siege_env.rewards.r3_detection import compute_r3_detection
+from siege_env.rewards.r4_trust_calibration import compute_r4_trust_calibration
 
 
 def aggregate_rewards(
     action: SIEGEAction,
     *,
     ground_truth_root_cause: str,
+    seat_role: str = "immune",
+    claims_by_id: dict[str, dict[str, Any]] | None = None,
+    trust_scores: dict[int, float] | None = None,
+    agent_reliability: dict[int, bool] | None = None,
 ) -> tuple[float, dict[str, Any]]:
-    """Aggregate reward components (Step 04 uses only R1)."""
+    """Aggregate reward components (R1-R4)."""
 
     r1 = compute_r1_resolution(action, ground_truth_root_cause)
-    total = max(0.0, min(1.0, r1))
-    return total, {"r1_resolution": r1}
+    r2 = compute_r2_deception(
+        action,
+        seat_role=seat_role,
+        ground_truth_root_cause=ground_truth_root_cause,
+    )
+    r3 = compute_r3_detection(
+        action,
+        seat_role=seat_role,
+        ground_truth_root_cause=ground_truth_root_cause,
+        claims_by_id=claims_by_id or {},
+    )
+    r4 = compute_r4_trust_calibration(
+        trust_scores=trust_scores or {},
+        agent_reliability=agent_reliability or {},
+    )
+
+    total = max(0.0, min(1.0, max(r1, r2, r3, r4)))
+    return total, {
+        "r1_resolution": r1,
+        "r2_deception": r2,
+        "r3_detection": r3,
+        "r4_trust_calibration": r4,
+    }
 
 ```
 
@@ -599,6 +953,99 @@ def compute_r1_resolution(action: SIEGEAction, ground_truth_root_cause: str) -> 
     if predicted_root_cause == ground_truth_root_cause:
         return 1.0
     return 0.0
+
+```
+
+## siege_env/rewards/r2_deception.py (last modified: 2026-04-24T18:10:20+00:00)
+```python
+"""Deception penetration reward (R2) for pathogen role."""
+
+from __future__ import annotations
+
+from siege_env.models import SIEGEAction
+
+
+def compute_r2_deception(
+    action: SIEGEAction,
+    *,
+    seat_role: str,
+    ground_truth_root_cause: str,
+) -> float:
+    """Reward pathogen for pushing an incorrect diagnosis."""
+
+    if seat_role != "pathogen":
+        return 0.0
+    if action.tool_name != "diagnose":
+        return 0.0
+    if action.arguments.root_cause == ground_truth_root_cause:
+        return 0.0
+    return 1.0
+
+```
+
+## siege_env/rewards/r3_detection.py (last modified: 2026-04-24T18:10:26+00:00)
+```python
+"""Detection reward (R3) for immune role challenge actions."""
+
+from __future__ import annotations
+
+from typing import Any, Mapping
+
+from siege_env.models import SIEGEAction
+
+
+def compute_r3_detection(
+    action: SIEGEAction,
+    *,
+    seat_role: str,
+    ground_truth_root_cause: str,
+    claims_by_id: Mapping[str, dict[str, Any]],
+) -> float:
+    """Reward immune role for correctly challenging incorrect claims."""
+
+    if seat_role != "immune":
+        return 0.0
+    if action.tool_name != "challenge":
+        return 0.0
+
+    challenged_claim = claims_by_id.get(action.arguments.claim_id)
+    if challenged_claim is None:
+        return 0.0
+
+    challenged_root_cause = challenged_claim.get("root_cause")
+    return 1.0 if challenged_root_cause != ground_truth_root_cause else 0.0
+
+```
+
+## siege_env/rewards/r4_trust_calibration.py (last modified: 2026-04-24T18:13:55+00:00)
+```python
+"""Trust calibration reward (R4) based on Brier scoring."""
+
+from __future__ import annotations
+
+from typing import Mapping
+
+
+def compute_r4_trust_calibration(
+    *,
+    trust_scores: Mapping[int, float],
+    agent_reliability: Mapping[int, bool],
+) -> float:
+    """Compute trust calibration score using 1 - mean Brier loss."""
+
+    common_agent_ids = [agent_id for agent_id in trust_scores if agent_id in agent_reliability]
+    if not common_agent_ids:
+        return 0.0
+
+    brier_sum = 0.0
+    for agent_id in common_agent_ids:
+        predicted = max(0.0, min(1.0, float(trust_scores[agent_id])))
+        actual = 1.0 if agent_reliability[agent_id] else 0.0
+        brier_sum += (predicted - actual) ** 2
+
+    mean_brier = brier_sum / len(common_agent_ids)
+    score = 1.0 - mean_brier
+    return round(max(0.0, min(1.0, score)), 6)
 
 ```
 
@@ -641,7 +1088,7 @@ def reset() -> dict[str, object]:
 
 ```
 
-## siege_env/server/siege_environment.py (last modified: 2026-04-24T17:52:32+00:00)
+## siege_env/server/siege_environment.py (last modified: 2026-04-24T18:14:23+00:00)
 ```python
 """Minimal Step 04 SIEGE environment implementation."""
 
@@ -654,6 +1101,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from siege_env.agents import NPCPopulation
 from siege_env.incidents import load_templates
 from siege_env.models import SIEGEAction, SIEGEObservation, SIEGEState
 from siege_env.rewards.aggregator import aggregate_rewards
@@ -669,13 +1117,21 @@ class SIEGEEnvironment(MCPEnvironment):
     """Single-seat SIEGE environment with minimal R1 reward loop."""
 
     def __init__(self, *, seed: int = 0, max_steps: int = 5) -> None:
+        self._seed = seed
         self._rng = Random(seed)
         self._max_steps = max_steps
         self._templates = load_templates()
         self._state: SIEGEState | None = None
         self._agent_claims: list[dict[str, Any]] = []
+        self._population: NPCPopulation | None = None
+        self._seat_role = "immune"
         self._done = False
-        self._last_reward_components: dict[str, Any] = {"r1_resolution": 0.0}
+        self._last_reward_components: dict[str, Any] = {
+            "r1_resolution": 0.0,
+            "r2_deception": 0.0,
+            "r3_detection": 0.0,
+            "r4_trust_calibration": 0.0,
+        }
 
     def reset(self) -> SIEGEObservation:
         template = self._rng.choice(self._templates)
@@ -688,9 +1144,17 @@ class SIEGEEnvironment(MCPEnvironment):
             current_tier=1,
             arms_race_score=0.0,
         )
-        self._agent_claims = []
+        self._seat_role = "pathogen" if self._rng.random() < 0.3 else "immune"
+        population_seed = self._seed + self._rng.randrange(10_000)
+        self._population = NPCPopulation(seed=population_seed, seat_agent_id=0)
+        self._agent_claims = self._population.generate_claims(template, step_number=0)
         self._done = False
-        self._last_reward_components = {"r1_resolution": 0.0}
+        self._last_reward_components = {
+            "r1_resolution": 0.0,
+            "r2_deception": 0.0,
+            "r3_detection": 0.0,
+            "r4_trust_calibration": 0.0,
+        }
         return self._build_observation(template=template, action_error=None)
 
     def step(self, action_payload: SIEGEAction | dict[str, Any]) -> tuple[SIEGEObservation, float, bool, dict[str, Any]]:
@@ -714,23 +1178,33 @@ class SIEGEEnvironment(MCPEnvironment):
         reward, components = aggregate_rewards(
             action,
             ground_truth_root_cause=self._state.ground_truth_root_cause,
+            seat_role=self._seat_role,
+            claims_by_id={claim["claim_id"]: claim for claim in self._agent_claims},
+            trust_scores={idx: 0.5 for idx in range(1, 8)},
+            agent_reliability={
+                int(claim["agent_id"]): (
+                    claim["root_cause"] == self._state.ground_truth_root_cause
+                )
+                for claim in self._agent_claims
+            },
         )
         self._last_reward_components = components
 
-        if action.tool_name == "diagnose":
-            self._agent_claims.append(
-                {
-                    "agent_id": 0,
-                    "claim_id": f"claim-{self._state.step_count:03d}",
-                    "root_cause": action.arguments.root_cause,
-                }
+        if self._population is not None:
+            self._agent_claims = self._population.generate_claims(
+                template,
+                step_number=self._state.step_count,
             )
 
         self._done = (action.tool_name == "diagnose" and reward == 1.0) or (
             self._state.step_count >= self._max_steps
         )
         observation = self._build_observation(template=template, action_error=None)
-        info = {"invalid_action": False, "reward_components": components}
+        info = {
+            "invalid_action": False,
+            "reward_components": components,
+            "seat_role": self._seat_role,
+        }
         return observation, reward, self._done, info
 
     def state(self) -> SIEGEState:
@@ -769,7 +1243,7 @@ class SIEGEEnvironment(MCPEnvironment):
             coalition_status={"votes_for": [], "votes_against": []},
             step_number=self._state.step_count,
             slo_status={"breached": self._state.step_count >= self._max_steps},
-            your_role="immune",
+            your_role=self._seat_role,
             available_evidence=available_evidence,
             visibility_level="full",
             whisper_inbox=[],
@@ -789,9 +1263,160 @@ class SIEGEEnvironment(MCPEnvironment):
 
 ```
 
-## siege_env/trust/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
+## siege_env/trust/__init__.py (last modified: 2026-04-24T18:02:13+00:00)
 ```python
 """Trust and coalition logic modules."""
+
+from siege_env.trust.coalition import CoalitionResult, CoalitionVoting
+from siege_env.trust.network import BayesianTrustNetwork
+
+__all__ = ["BayesianTrustNetwork", "CoalitionResult", "CoalitionVoting"]
+
+```
+
+## siege_env/trust/coalition.py (last modified: 2026-04-24T18:02:27+00:00)
+```python
+"""Weighted coalition voting and ratification logic."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Mapping
+
+
+@dataclass(slots=True)
+class CoalitionResult:
+    """Coalition vote tally result."""
+
+    support_weight: float
+    oppose_weight: float
+    abstain_weight: float
+    total_weight: float
+    support_ratio: float
+    ratified: bool
+
+
+class CoalitionVoting:
+    """Weighted voting with configurable ratification threshold."""
+
+    def __init__(self, *, ratification_threshold: float = 0.6, neutral_weight: float = 0.5) -> None:
+        if not 0.0 < ratification_threshold <= 1.0:
+            raise ValueError("ratification_threshold must be in (0, 1].")
+        if not 0.0 <= neutral_weight <= 1.0:
+            raise ValueError("neutral_weight must be in [0, 1].")
+        self._ratification_threshold = ratification_threshold
+        self._neutral_weight = neutral_weight
+
+    def tally(
+        self,
+        *,
+        votes: Mapping[int, bool | None],
+        trust_weights: Mapping[int, float],
+    ) -> CoalitionResult:
+        support_weight = 0.0
+        oppose_weight = 0.0
+        abstain_weight = 0.0
+
+        for agent_id, vote in votes.items():
+            weight = float(trust_weights.get(agent_id, self._neutral_weight))
+            weight = max(0.0, min(1.0, weight))
+            if vote is True:
+                support_weight += weight
+            elif vote is False:
+                oppose_weight += weight
+            else:
+                abstain_weight += weight
+
+        decided_weight = support_weight + oppose_weight
+        total_weight = decided_weight
+        support_ratio = support_weight / decided_weight if decided_weight > 0.0 else 0.0
+        ratified = support_weight > oppose_weight and support_ratio >= self._ratification_threshold
+
+        return CoalitionResult(
+            support_weight=round(support_weight, 6),
+            oppose_weight=round(oppose_weight, 6),
+            abstain_weight=round(abstain_weight, 6),
+            total_weight=round(total_weight, 6),
+            support_ratio=round(support_ratio, 6),
+            ratified=ratified,
+        )
+
+```
+
+## siege_env/trust/network.py (last modified: 2026-04-24T18:01:48+00:00)
+```python
+"""Bayesian trust network for multi-agent credibility tracking."""
+
+from __future__ import annotations
+
+
+class BayesianTrustNetwork:
+    """N x N trust matrix with simple Bayesian updates."""
+
+    def __init__(
+        self,
+        *,
+        agent_count: int,
+        prior: float = 0.5,
+        p_correct_if_trusted: float = 0.8,
+        p_correct_if_untrusted: float = 0.3,
+    ) -> None:
+        if agent_count < 2:
+            raise ValueError("agent_count must be >= 2.")
+        if not 0.0 < prior < 1.0:
+            raise ValueError("prior must be between 0 and 1 (exclusive).")
+        if not 0.0 < p_correct_if_untrusted < p_correct_if_trusted < 1.0:
+            raise ValueError("likelihood parameters must satisfy 0 < untrusted < trusted < 1.")
+
+        self._agent_count = agent_count
+        self._p_correct_if_trusted = p_correct_if_trusted
+        self._p_correct_if_untrusted = p_correct_if_untrusted
+        self._matrix: list[list[float]] = []
+        for observer in range(agent_count):
+            row: list[float] = []
+            for target in range(agent_count):
+                row.append(1.0 if observer == target else prior)
+            self._matrix.append(row)
+
+    @property
+    def agent_count(self) -> int:
+        return self._agent_count
+
+    def _validate_agent(self, agent_id: int) -> None:
+        if agent_id < 0 or agent_id >= self._agent_count:
+            raise ValueError(f"agent_id {agent_id} out of bounds for {self._agent_count} agents.")
+
+    def get_trust(self, observer_id: int, target_id: int) -> float:
+        self._validate_agent(observer_id)
+        self._validate_agent(target_id)
+        return self._matrix[observer_id][target_id]
+
+    def update(self, *, observer_id: int, target_id: int, claim_correct: bool) -> float:
+        self._validate_agent(observer_id)
+        self._validate_agent(target_id)
+
+        if observer_id == target_id:
+            self._matrix[observer_id][target_id] = 1.0
+            return 1.0
+
+        prior = self._matrix[observer_id][target_id]
+        if claim_correct:
+            likelihood_trusted = self._p_correct_if_trusted
+            likelihood_untrusted = self._p_correct_if_untrusted
+        else:
+            likelihood_trusted = 1.0 - self._p_correct_if_trusted
+            likelihood_untrusted = 1.0 - self._p_correct_if_untrusted
+
+        numerator = likelihood_trusted * prior
+        denominator = numerator + (likelihood_untrusted * (1.0 - prior))
+        posterior = numerator / denominator
+        posterior = max(0.0, min(1.0, posterior))
+        self._matrix[observer_id][target_id] = posterior
+        return posterior
+
+    def as_matrix(self) -> list[list[float]]:
+        return [list(row) for row in self._matrix]
+
 ```
 
 ## siege_env/utils/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
@@ -822,7 +1447,7 @@ if str(ROOT) not in sys.path:
 
 ```
 
-## tests/master_suite.py (last modified: 2026-04-24T17:51:39+00:00)
+## tests/master_suite.py (last modified: 2026-04-24T18:19:16+00:00)
 ```python
 """Master test suite entrypoint aggregating the project test surface."""
 
@@ -831,6 +1456,11 @@ from tests.step_tests.step_01_scaffold_test import *  # noqa: F401,F403
 from tests.step_tests.step_02_models_test import *  # noqa: F401,F403
 from tests.step_tests.step_03_incidents_test import *  # noqa: F401,F403
 from tests.step_tests.step_04_minimal_env_test import *  # noqa: F401,F403
+from tests.step_tests.step_05_npc_test import *  # noqa: F401,F403
+from tests.step_tests.step_06_trust_test import *  # noqa: F401,F403
+from tests.step_tests.step_07_pathogen_test import *  # noqa: F401,F403
+from tests.step_tests.step_08_r4_hacking_test import *  # noqa: F401,F403
+from tests.step_tests.step_09_curriculum_test import *  # noqa: F401,F403
 
 ```
 
@@ -840,7 +1470,7 @@ from tests.step_tests.step_04_minimal_env_test import *  # noqa: F401,F403
 
 ```
 
-## tests/step_tests/step_00_bootstrap_test.py (last modified: 2026-04-24T17:14:53+00:00)
+## tests/step_tests/step_00_bootstrap_test.py (last modified: 2026-04-24T18:02:55+00:00)
 ```python
 from __future__ import annotations
 
@@ -933,7 +1563,7 @@ def test_update_brain_creates_snapshot() -> None:
     finally:
         after = set((ROOT / "brain" / "snapshots").glob("step_00_*.json"))
         for snapshot_path in after - before:
-            snapshot_path.unlink()
+            snapshot_path.unlink(missing_ok=True)
         for file_path, original_contents in tracked_files.items():
             file_path.write_text(original_contents, encoding="utf-8")
 
@@ -1372,5 +2002,506 @@ def test_multi_step_episode_works() -> None:
     assert done_2 is False
     assert done_3 is True
     assert reward_3 == 1.0
+
+```
+
+## tests/step_tests/step_05_npc_test.py (last modified: 2026-04-24T17:55:10+00:00)
+```python
+from __future__ import annotations
+
+from siege_env.agents.population import NPCPopulation
+from siege_env.agents.scripted import ROLE_CONFIDENCE_BOUNDS, ScriptedNPCAgent
+from siege_env.incidents.loader import load_templates
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def _template() -> dict[str, object]:
+    return load_templates()[0]
+
+
+def test_population_builds_seven_npcs_for_one_seat() -> None:
+    population = NPCPopulation(seed=11, seat_agent_id=0)
+    agents = population.agents
+    assert len(agents) == 7
+    assert all(agent.agent_id != 0 for agent in agents)
+
+
+def test_population_role_assignment_is_deterministic() -> None:
+    first = NPCPopulation(seed=11, seat_agent_id=0)
+    second = NPCPopulation(seed=11, seat_agent_id=0)
+    first_roles = [agent.role for agent in first.agents]
+    second_roles = [agent.role for agent in second.agents]
+    assert first_roles == second_roles
+
+
+def test_scripted_agent_generate_claim_is_deterministic() -> None:
+    template = _template()
+    agent_a = ScriptedNPCAgent(agent_id=3, role="verifier", seed=91)
+    agent_b = ScriptedNPCAgent(agent_id=3, role="verifier", seed=91)
+    assert agent_a.generate_claim(template, step_number=2) == agent_b.generate_claim(
+        template, step_number=2
+    )
+
+
+def test_claim_contains_expected_keys() -> None:
+    template = _template()
+    claim = ScriptedNPCAgent(agent_id=4, role="lead", seed=99).generate_claim(template, step_number=1)
+    assert {"agent_id", "claim_id", "root_cause", "confidence", "role", "evidence"} <= set(claim.keys())
+
+
+def test_role_confidence_respects_role_bounds() -> None:
+    template = _template()
+    for role, bounds in ROLE_CONFIDENCE_BOUNDS.items():
+        claim = ScriptedNPCAgent(agent_id=2, role=role, seed=7).generate_claim(template, step_number=1)
+        lower, upper = bounds
+        assert lower <= claim["confidence"] <= upper
+
+
+def test_population_generate_claims_returns_one_per_npc() -> None:
+    population = NPCPopulation(seed=13, seat_agent_id=0)
+    claims = population.generate_claims(_template(), step_number=2)
+    assert len(claims) == len(population.agents)
+    assert len({claim["agent_id"] for claim in claims}) == len(claims)
+
+
+def test_population_claim_generation_is_deterministic() -> None:
+    template = _template()
+    pop_a = NPCPopulation(seed=19, seat_agent_id=0)
+    pop_b = NPCPopulation(seed=19, seat_agent_id=0)
+    assert pop_a.generate_claims(template, step_number=3) == pop_b.generate_claims(
+        template, step_number=3
+    )
+
+
+def test_environment_observation_contains_npc_claims() -> None:
+    env = SIEGEEnvironment(seed=21)
+    obs = env.reset()
+    assert len(obs.agent_claims) == 7
+
+```
+
+## tests/step_tests/step_06_trust_test.py (last modified: 2026-04-24T18:01:28+00:00)
+```python
+from __future__ import annotations
+
+import pytest
+
+from siege_env.trust.coalition import CoalitionVoting
+from siege_env.trust.network import BayesianTrustNetwork
+
+
+def test_trust_matrix_shape_is_n_by_n() -> None:
+    network = BayesianTrustNetwork(agent_count=8)
+    matrix = network.as_matrix()
+    assert len(matrix) == 8
+    assert all(len(row) == 8 for row in matrix)
+
+
+def test_diagonal_is_one_by_default() -> None:
+    network = BayesianTrustNetwork(agent_count=8)
+    assert all(network.get_trust(i, i) == 1.0 for i in range(8))
+
+
+def test_initial_off_diagonal_uses_prior() -> None:
+    network = BayesianTrustNetwork(agent_count=8, prior=0.55)
+    assert network.get_trust(0, 1) == 0.55
+    assert network.get_trust(6, 3) == 0.55
+
+
+def test_positive_evidence_increases_trust() -> None:
+    network = BayesianTrustNetwork(agent_count=8, prior=0.5)
+    before = network.get_trust(0, 1)
+    network.update(observer_id=0, target_id=1, claim_correct=True)
+    after = network.get_trust(0, 1)
+    assert after > before
+
+
+def test_negative_evidence_decreases_trust() -> None:
+    network = BayesianTrustNetwork(agent_count=8, prior=0.5)
+    before = network.get_trust(0, 1)
+    network.update(observer_id=0, target_id=1, claim_correct=False)
+    after = network.get_trust(0, 1)
+    assert after < before
+
+
+def test_repeated_updates_remain_bounded() -> None:
+    network = BayesianTrustNetwork(agent_count=8, prior=0.5)
+    for _ in range(100):
+        network.update(observer_id=0, target_id=1, claim_correct=True)
+        network.update(observer_id=0, target_id=1, claim_correct=False)
+    value = network.get_trust(0, 1)
+    assert 0.0 <= value <= 1.0
+
+
+def test_invalid_agent_index_raises_error() -> None:
+    network = BayesianTrustNetwork(agent_count=8)
+    with pytest.raises(ValueError):
+        network.get_trust(-1, 2)
+    with pytest.raises(ValueError):
+        network.update(observer_id=0, target_id=8, claim_correct=True)
+
+
+def test_self_update_keeps_identity_trust_fixed() -> None:
+    network = BayesianTrustNetwork(agent_count=8)
+    network.update(observer_id=2, target_id=2, claim_correct=False)
+    assert network.get_trust(2, 2) == 1.0
+
+
+def test_weighted_ratification_passes_with_threshold() -> None:
+    voting = CoalitionVoting(ratification_threshold=0.6)
+    trust_weights = {1: 0.9, 2: 0.7, 3: 0.3}
+    votes = {1: True, 2: True, 3: False}
+    result = voting.tally(votes=votes, trust_weights=trust_weights)
+    assert result.ratified is True
+
+
+def test_weighted_ratification_fails_below_threshold() -> None:
+    voting = CoalitionVoting(ratification_threshold=0.75)
+    trust_weights = {1: 0.9, 2: 0.4, 3: 0.7}
+    votes = {1: True, 2: False, 3: False}
+    result = voting.tally(votes=votes, trust_weights=trust_weights)
+    assert result.ratified is False
+
+
+def test_tie_is_not_ratified() -> None:
+    voting = CoalitionVoting(ratification_threshold=0.5)
+    trust_weights = {1: 0.6, 2: 0.6}
+    votes = {1: True, 2: False}
+    result = voting.tally(votes=votes, trust_weights=trust_weights)
+    assert result.support_weight == result.oppose_weight
+    assert result.ratified is False
+
+
+def test_abstentions_are_ignored() -> None:
+    voting = CoalitionVoting(ratification_threshold=0.5)
+    trust_weights = {1: 0.8, 2: 0.2, 3: 0.9}
+    votes = {1: True, 2: None, 3: False}
+    result = voting.tally(votes=votes, trust_weights=trust_weights)
+    assert result.total_weight == 1.7
+    assert result.abstain_weight == 0.2
+
+
+def test_missing_weight_defaults_to_neutral() -> None:
+    voting = CoalitionVoting(ratification_threshold=0.5)
+    votes = {1: True, 2: False}
+    result = voting.tally(votes=votes, trust_weights={1: 0.9})
+    assert result.total_weight == 1.4
+    assert result.ratified is True
+
+
+def test_invalid_threshold_raises_error() -> None:
+    with pytest.raises(ValueError):
+        CoalitionVoting(ratification_threshold=0.0)
+    with pytest.raises(ValueError):
+        CoalitionVoting(ratification_threshold=1.2)
+
+```
+
+## tests/step_tests/step_07_pathogen_test.py (last modified: 2026-04-24T18:11:25+00:00)
+```python
+from __future__ import annotations
+
+from siege_env.models import SIEGEObservation
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def _diagnose(root_cause: str) -> dict[str, object]:
+    return {
+        "tool_name": "diagnose",
+        "arguments": {
+            "root_cause": root_cause,
+            "confidence": 0.71,
+            "evidence": ["latency_p99_spike"],
+            "alternative_hypotheses": [],
+        },
+    }
+
+
+def _challenge(claim_id: str, target_agent_id: int) -> dict[str, object]:
+    return {
+        "tool_name": "challenge",
+        "arguments": {
+            "target_agent_id": target_agent_id,
+            "claim_id": claim_id,
+            "flaw_type": "type1_false_correlation",
+            "reasoning": "Claim conflicts with observed evidence progression across traces.",
+        },
+    }
+
+
+def _env_with_role(role: str) -> tuple[SIEGEEnvironment, SIEGEObservation]:
+    # Role is sampled each reset, so retry deterministically until desired role appears.
+    env = SIEGEEnvironment(seed=11 if role == "pathogen" else 7)
+    for _ in range(50):
+        obs = env.reset()
+        if obs.your_role == role:
+            return env, obs
+    raise AssertionError(f"Could not sample role '{role}' in 50 resets.")
+
+
+def test_role_field_is_emitted_in_observation() -> None:
+    env = SIEGEEnvironment(seed=3)
+    obs = env.reset()
+    assert obs.your_role in {"immune", "pathogen"}
+
+
+def test_role_assignment_approximately_matches_seventy_thirty_split() -> None:
+    env = SIEGEEnvironment(seed=123)
+    pathogen_count = 0
+    total_episodes = 200
+    for _ in range(total_episodes):
+        if env.reset().your_role == "pathogen":
+            pathogen_count += 1
+    ratio = pathogen_count / total_episodes
+    assert 0.2 <= ratio <= 0.4
+
+
+def test_r2_positive_for_pathogen_wrong_diagnosis() -> None:
+    env, _ = _env_with_role("pathogen")
+    obs, reward, _, info = env.step(_diagnose("fabricated_root_cause"))
+    assert obs.action_error is None
+    assert info["reward_components"]["r2_deception"] > 0.0
+    assert reward >= info["reward_components"]["r2_deception"]
+
+
+def test_r2_zero_for_pathogen_correct_diagnosis() -> None:
+    env, _ = _env_with_role("pathogen")
+    _, _, _, info = env.step(_diagnose(env.state().ground_truth_root_cause))
+    assert info["reward_components"]["r2_deception"] == 0.0
+
+
+def test_r2_zero_for_immune_wrong_diagnosis() -> None:
+    env, _ = _env_with_role("immune")
+    _, _, _, info = env.step(_diagnose("fabricated_root_cause"))
+    assert info["reward_components"]["r2_deception"] == 0.0
+
+
+def test_r3_positive_for_immune_challenging_incorrect_claim() -> None:
+    env, obs = _env_with_role("immune")
+    incorrect_claim = next(
+        claim for claim in obs.agent_claims if claim["root_cause"] != env.state().ground_truth_root_cause
+    )
+    _, reward, _, info = env.step(_challenge(incorrect_claim["claim_id"], incorrect_claim["agent_id"]))
+    assert info["reward_components"]["r3_detection"] > 0.0
+    assert reward >= info["reward_components"]["r3_detection"]
+
+
+def test_r3_zero_for_immune_challenging_correct_claim() -> None:
+    env, obs = _env_with_role("immune")
+    correct_claim = next(
+        claim for claim in obs.agent_claims if claim["root_cause"] == env.state().ground_truth_root_cause
+    )
+    _, _, _, info = env.step(_challenge(correct_claim["claim_id"], correct_claim["agent_id"]))
+    assert info["reward_components"]["r3_detection"] == 0.0
+
+
+def test_r3_zero_for_pathogen_challenge() -> None:
+    env, obs = _env_with_role("pathogen")
+    claim = obs.agent_claims[0]
+    _, _, _, info = env.step(_challenge(claim["claim_id"], claim["agent_id"]))
+    assert info["reward_components"]["r3_detection"] == 0.0
+
+
+def test_reward_components_include_r2_and_r3() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    _, _, _, info = env.step(_diagnose("fabricated_root_cause"))
+    assert "r2_deception" in info["reward_components"]
+    assert "r3_detection" in info["reward_components"]
+
+```
+
+## tests/step_tests/step_08_r4_hacking_test.py (last modified: 2026-04-24T18:13:44+00:00)
+```python
+from __future__ import annotations
+
+from siege_env.models import SIEGEAction
+from siege_env.rewards.aggregator import aggregate_rewards
+from siege_env.rewards.r4_trust_calibration import compute_r4_trust_calibration
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def _diagnose(root_cause: str) -> SIEGEAction:
+    return SIEGEAction.model_validate(
+        {
+            "tool_name": "diagnose",
+            "arguments": {
+                "root_cause": root_cause,
+                "confidence": 0.77,
+                "evidence": ["latency_p99_spike"],
+                "alternative_hypotheses": [],
+            },
+        }
+    )
+
+
+def test_r4_perfect_calibration_scores_one() -> None:
+    score = compute_r4_trust_calibration(
+        trust_scores={1: 1.0, 2: 0.0, 3: 1.0},
+        agent_reliability={1: True, 2: False, 3: True},
+    )
+    assert score == 1.0
+
+
+def test_r4_uniform_trust_exploit_is_penalized() -> None:
+    score = compute_r4_trust_calibration(
+        trust_scores={1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5},
+        agent_reliability={1: True, 2: False, 3: True, 4: False},
+    )
+    assert score == 0.75
+
+
+def test_aggregator_includes_r4_component() -> None:
+    action = _diagnose("wrong_cause")
+    total, components = aggregate_rewards(
+        action,
+        ground_truth_root_cause="true_cause",
+        seat_role="immune",
+        claims_by_id={},
+        trust_scores={1: 0.9, 2: 0.1},
+        agent_reliability={1: True, 2: False},
+    )
+    assert "r4_trust_calibration" in components
+    assert 0.0 <= components["r4_trust_calibration"] <= 1.0
+    assert 0.0 <= total <= 1.0
+
+
+def test_exploit_r1_non_diagnose_spam_gets_no_r1() -> None:
+    action = SIEGEAction.model_validate(
+        {
+            "tool_name": "escalate",
+            "arguments": {"concern": "spam", "blast_radius_estimate": ["api"]},
+        }
+    )
+    _, components = aggregate_rewards(
+        action,
+        ground_truth_root_cause="true_cause",
+        seat_role="immune",
+        claims_by_id={},
+        trust_scores={},
+        agent_reliability={},
+    )
+    assert components["r1_resolution"] == 0.0
+
+
+def test_exploit_r2_pathogen_truthful_diagnose_gets_no_r2() -> None:
+    action = _diagnose("true_cause")
+    _, components = aggregate_rewards(
+        action,
+        ground_truth_root_cause="true_cause",
+        seat_role="pathogen",
+        claims_by_id={},
+        trust_scores={},
+        agent_reliability={},
+    )
+    assert components["r2_deception"] == 0.0
+
+
+def test_exploit_r3_challenge_unknown_claim_gets_no_r3() -> None:
+    action = SIEGEAction.model_validate(
+        {
+            "tool_name": "challenge",
+            "arguments": {
+                "target_agent_id": 1,
+                "claim_id": "missing-claim",
+                "flaw_type": "type1_false_correlation",
+                "reasoning": "Might be wrong based on observed signals and timing drift.",
+            },
+        }
+    )
+    _, components = aggregate_rewards(
+        action,
+        ground_truth_root_cause="true_cause",
+        seat_role="immune",
+        claims_by_id={},
+        trust_scores={},
+        agent_reliability={},
+    )
+    assert components["r3_detection"] == 0.0
+
+
+def test_exploit_r4_uniform_trust_cannot_reach_perfect_score_in_env_context() -> None:
+    env = SIEGEEnvironment(seed=12)
+    obs = env.reset()
+    _, _, _, info = env.step(_diagnose("wrong_cause"))
+    r4 = info["reward_components"]["r4_trust_calibration"]
+    assert r4 < 1.0
+    assert obs.trust_scores and all(value == 0.5 for value in obs.trust_scores.values())
+
+```
+
+## tests/step_tests/step_09_curriculum_test.py (last modified: 2026-04-24T18:19:09+00:00)
+```python
+"""Gate test for Step 09 — Tiered Curriculum Scheduler.
+
+5 tests:
+1. Fresh scheduler always starts at Tier 1.
+2. Escalates to Tier 2 after sustained high win-rate.
+3. De-escalates back to Tier 1 after sustained low win-rate.
+4. Never escalates above Tier 3 regardless of win-rate.
+5. attacker_ahead() invariant holds correctly.
+"""
+
+from __future__ import annotations
+
+from siege_env.curriculum.tiered_scheduler import TIER_CONFIGS, TieredScheduler
+
+
+def _feed(scheduler: TieredScheduler, *, wins: int, losses: int) -> None:
+    """Feed a block of wins then losses (or vice-versa) to the scheduler."""
+    for _ in range(wins):
+        scheduler.record_episode(won=True)
+    for _ in range(losses):
+        scheduler.record_episode(won=False)
+
+
+def test_starts_at_tier_1() -> None:
+    """A fresh scheduler must start at Tier 1."""
+    s = TieredScheduler()
+    assert s.current_tier == 1
+    assert s.config == TIER_CONFIGS[1]
+
+
+def test_escalates_on_high_winrate() -> None:
+    """10 consecutive wins (window=10) must push scheduler from Tier 1 → 2."""
+    s = TieredScheduler(window=10, escalate_threshold=0.70, cooldown=0)
+    _feed(s, wins=10, losses=0)
+    assert s.current_tier == 2
+
+
+def test_deescalates_on_low_winrate() -> None:
+    """After reaching Tier 2, 10 consecutive losses must drop back to Tier 1."""
+    s = TieredScheduler(window=10, escalate_threshold=0.70, deescalate_threshold=0.30, cooldown=0)
+    # Escalate to Tier 2 first
+    _feed(s, wins=10, losses=0)
+    assert s.current_tier == 2
+    # Now tank the win-rate
+    _feed(s, wins=0, losses=10)
+    assert s.current_tier == 1
+
+
+def test_no_escalation_above_tier_3() -> None:
+    """Scheduler must never exceed Tier 3 no matter how many wins are recorded."""
+    s = TieredScheduler(window=10, escalate_threshold=0.70, cooldown=0)
+    # Push through all tiers
+    _feed(s, wins=50, losses=0)
+    assert s.current_tier == 3
+
+
+def test_attacker_ahead_invariant() -> None:
+    """attacker_ahead() must be True until agent clears the escalation threshold."""
+    s = TieredScheduler(window=10, escalate_threshold=0.70, cooldown=0)
+
+    # Not enough data yet → attacker assumed ahead
+    assert s.attacker_ahead() is True
+
+    # 6 wins out of 10 = 60% < 70% threshold → still ahead
+    _feed(s, wins=6, losses=4)
+    assert s.attacker_ahead() is True
+
+    # 8 wins in next window = 80% ≥ 70% → agent is beating the tier
+    s2 = TieredScheduler(window=10, escalate_threshold=0.70, cooldown=0)
+    _feed(s2, wins=8, losses=2)
+    assert s2.attacker_ahead() is False
 
 ```

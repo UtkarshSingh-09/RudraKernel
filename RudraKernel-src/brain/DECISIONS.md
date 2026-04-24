@@ -56,3 +56,64 @@ Decision:
 Consequences:
 - Step 04 remains aligned with MCP-first architecture and is testable in constrained local environments.
 - Later steps can replace the fallback path without changing environment behavior contracts.
+
+## ADR-004: Scripted NPC population uses deterministic role-conditioned policies
+Status: Accepted
+
+Context:
+- Step 05 requires fast scripted NPCs with deterministic claim generation and role compliance tests.
+- Phase A prioritizes reproducibility over realism.
+
+Decision:
+- Introduce `ScriptedNPCAgent` roles (`lead`, `verifier`, `contrarian`) with fixed confidence bands.
+- Add `NPCPopulation` orchestrator that builds 7 NPC agents (for a single seat setup) and emits deterministic claims from a seed.
+
+Consequences:
+- Claim generation is stable for test gates and replay/debug workflows.
+- Later steps can swap/augment policies without changing population contract.
+
+## ADR-005: Trust is modeled with per-observer Bayesian updates plus weighted coalition ratification
+Status: Accepted
+
+Context:
+- Step 06 requires an `N x N` trust matrix and weighted coalition voting gate.
+- The implementation needs deterministic behavior suitable for strict gate tests.
+
+Decision:
+- Add `BayesianTrustNetwork` with diagonal self-trust fixed at `1.0` and posterior updates from claim correctness signals.
+- Add `CoalitionVoting` that computes weighted support/oppose tallies and ratifies only when support beats oppose and clears a threshold.
+
+Consequences:
+- Trust evolution and coalition decisions are now explicit primitives for Steps 07+.
+- The voting contract is stable and testable (including ties, abstentions, and default weights).
+
+## ADR-006: Seat role is sampled per episode (70/30) and R2/R3 are role-gated
+Status: Accepted
+
+Context:
+- Step 07 introduces pathogen role assignment and reward components for deception/detection.
+- Step 04/05 contracts must remain stable while adding adversarial dynamics.
+
+Decision:
+- Sample seat role on reset with probability `P(pathogen)=0.3`, `P(immune)=0.7`.
+- Add `R2` (pathogen deception reward for incorrect diagnose) and `R3` (immune detection reward for correctly challenging incorrect claims) as separate components in the aggregator.
+
+Consequences:
+- Role-split behavior is now testable at environment level.
+- Later reward steps can build on a clean, composable reward-component interface.
+
+## ADR-007: Trust calibration uses Brier scoring and exploit-counter tests for R1-R4
+Status: Accepted
+
+Context:
+- Step 08 introduces R4 trust calibration and requires reward-hacking resistance tests for R1-R4.
+- Existing reward aggregation must remain bounded and composable.
+
+Decision:
+- Implement `R4` as `1 - mean_brier(trust_scores, actual_reliability)` with clamping to `[0, 1]`.
+- Extend aggregator inputs with `trust_scores` and `agent_reliability` and include `r4_trust_calibration` component.
+- Add explicit exploit-counter gate tests for trivial reward hacks across R1-R4.
+
+Consequences:
+- Trust calibration now has mathematically grounded scoring and deterministic tests.
+- Reward surface is harder to game with naive policies before adding later reward components.
