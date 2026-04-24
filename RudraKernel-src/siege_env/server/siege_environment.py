@@ -299,3 +299,22 @@ def _step_with_whispers_synced_observation(self: SIEGEEnvironment, action_payloa
 
 
 SIEGEEnvironment.step = _step_with_whispers_synced_observation
+
+# Step 17 append-only integration: red herrings + R9-enabled reward aggregation binding
+from siege_env.mechanics.red_herrings import generate_red_herrings
+from siege_env.rewards import aggregator as _aggregator_step17
+
+aggregate_rewards = _aggregator_step17.aggregate_rewards
+_ORIG_BUILD_OBS_STEP17 = SIEGEEnvironment._build_observation
+
+
+def _build_observation_with_red_herrings(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP17(self, template=template, action_error=action_error)
+    step_number = obs.step_number
+    red_herrings = generate_red_herrings(seed=getattr(self, "_seed", 0), step_number=step_number)
+    obs.red_herring_signals = red_herrings
+    obs.incident_dashboard["red_herrings"] = list(red_herrings)
+    return obs
+
+
+SIEGEEnvironment._build_observation = _build_observation_with_red_herrings

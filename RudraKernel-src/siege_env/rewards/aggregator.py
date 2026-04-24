@@ -57,3 +57,38 @@ def aggregate_rewards(
         "r5_confidence": r5,
         "r6_temporal": r6,
     }
+
+# Step 17 append-only extension: include R9 correlation reward
+from siege_env.rewards.r9_correlation import compute_r9_correlation
+
+_ORIGINAL_AGGREGATE_REWARDS_STEP17 = aggregate_rewards
+
+
+def aggregate_rewards(
+    action: SIEGEAction,
+    *,
+    ground_truth_root_cause: str,
+    seat_role: str = "immune",
+    claims_by_id: dict[str, dict[str, Any]] | None = None,
+    trust_scores: dict[int, float] | None = None,
+    agent_reliability: dict[int, bool] | None = None,
+    urgency_multiplier: float = 1.0,
+) -> tuple[float, dict[str, Any]]:
+    base_total, components = _ORIGINAL_AGGREGATE_REWARDS_STEP17(
+        action,
+        ground_truth_root_cause=ground_truth_root_cause,
+        seat_role=seat_role,
+        claims_by_id=claims_by_id,
+        trust_scores=trust_scores,
+        agent_reliability=agent_reliability,
+        urgency_multiplier=urgency_multiplier,
+    )
+    r9 = compute_r9_correlation(
+        action,
+        claims_by_id=claims_by_id,
+        ground_truth_root_cause=ground_truth_root_cause,
+    )
+    components = dict(components)
+    components["r9_correlation"] = r9
+    total = max(0.0, min(1.0, max(base_total, r9)))
+    return total, components

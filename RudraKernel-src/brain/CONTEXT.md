@@ -30,3 +30,9 @@
 - Gate test: PASS (4/4)
 - Master suite: PASS (118 passed, 2 skipped)
 - Status: Private channel actions now logged and surfaced in observations.
+
+## Step 17 Update (2026-04-24T19:38:20Z)
+- Latest step touched: 17 - Red Herrings + R9
+- Gate test: PASS (5/5)
+- Master suite: PASS (123 passed, 2 skipped)
+- Status: Correlation challenge reward and red-herring surface integrated.
