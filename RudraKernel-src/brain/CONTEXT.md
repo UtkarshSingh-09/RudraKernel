@@ -1,8 +1,8 @@
 # CURRENT CONTEXT
 
-- Updated: 2026-04-24T18:23:13.591992+00:00
-- Latest step touched: 10 - Trust Poisoning Strategy
-- Current status: Step 10 in sync with the repository
-- Gate test: PASS (6/6)
-- Master suite: PASS (77 passed)
+- Updated: 2026-04-24T18:37:11.100537+00:00
+- Latest step touched: 12 - Confidence Calibration + R5
+- Current status: Step 12 in sync with the repository
+- Gate test: PASS (5/5)
+- Master suite: PASS (87 passed)
 - Coverage: 0.0%

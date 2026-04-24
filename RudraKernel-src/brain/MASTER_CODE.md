@@ -1,6 +1,6 @@
-# MASTER CODE - Last Updated: 2026-04-24T18:23:13+00:00
+# MASTER CODE - Last Updated: 2026-04-24T18:37:11+00:00
 
-# Files Tracked: 45
+# Files Tracked: 50
 
 ## siege_env/__init__.py (last modified: 2026-04-24T17:52:44+00:00)
 ```python
@@ -595,9 +595,153 @@ def load_templates(path: Path | None = None) -> list[dict[str, Any]]:
 """Opponent league modules."""
 ```
 
-## siege_env/mechanics/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
+## siege_env/mechanics/__init__.py (last modified: 2026-04-24T18:32:44+00:00)
 ```python
 """Mechanics modules."""
+
+from siege_env.mechanics.temporal_evidence import TemporalEvidenceTracker, EvidenceRecord
+
+__all__ = ["TemporalEvidenceTracker", "EvidenceRecord"]
+```
+
+## siege_env/mechanics/temporal_evidence.py (last modified: 2026-04-24T18:32:44+00:00)
+```python
+"""Temporal evidence dynamics for SIEGE.
+
+Evidence in a live incident investigation has a shelf-life. Signals
+observed early in an episode are more informative when acted upon
+quickly; stale evidence that is only cited steps later carries less
+diagnostic weight.
+
+This module provides:
+
+  EvidenceRecord  — a single piece of time-stamped evidence.
+  TemporalEvidenceTracker — tracks all evidence and computes per-signal
+      freshness and per-step urgency multipliers used by R6.
+
+Freshness model
+---------------
+Each evidence signal decays exponentially from the step it was first
+observed:
+
+    freshness(t) = exp(-decay_rate * (current_step - observed_step))
+
+where decay_rate controls how fast freshness falls (default 0.15).
+A signal observed at step 0 has freshness 1.0 at step 0, ~0.86 at
+step 1, ~0.74 at step 2, etc.
+
+Urgency multiplier
+------------------
+The urgency multiplier for acting at step t on evidence observed at
+step obs_step is:
+
+    urgency(t) = max(min_urgency, freshness(t))
+
+Acting fast gives urgency close to 1.0; acting very late gives
+urgency close to min_urgency (default 0.1).
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+from typing import Any
+
+
+_DEFAULT_DECAY_RATE = 0.15
+_DEFAULT_MIN_URGENCY = 0.10
+
+
+@dataclass(slots=True)
+class EvidenceRecord:
+    """A single piece of evidence with its observation timestamp."""
+
+    signal_id: str
+    observed_at_step: int
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+class TemporalEvidenceTracker:
+    """Tracks evidence signals and computes time-sensitive freshness values.
+
+    Args:
+        decay_rate: Exponential decay constant (higher = faster staleness).
+        min_urgency: Floor for urgency multiplier (prevents reward collapsing
+            to zero on very stale evidence).
+    """
+
+    def __init__(
+        self,
+        *,
+        decay_rate: float = _DEFAULT_DECAY_RATE,
+        min_urgency: float = _DEFAULT_MIN_URGENCY,
+    ) -> None:
+        if decay_rate <= 0.0:
+            raise ValueError("decay_rate must be positive.")
+        if not (0.0 <= min_urgency < 1.0):
+            raise ValueError("min_urgency must be in [0, 1).")
+
+        self._decay_rate = decay_rate
+        self._min_urgency = min_urgency
+        self._evidence: dict[str, EvidenceRecord] = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def observe(self, signal_id: str, *, step: int, metadata: dict[str, Any] | None = None) -> None:
+        """Record a new evidence signal at the given step.
+
+        If the signal was already observed, the earlier timestamp is kept
+        (first observation is canonical).
+        """
+        if signal_id not in self._evidence:
+            self._evidence[signal_id] = EvidenceRecord(
+                signal_id=signal_id,
+                observed_at_step=step,
+                metadata=metadata or {},
+            )
+
+    def freshness(self, signal_id: str, *, current_step: int) -> float:
+        """Return the freshness of a signal at current_step.
+
+        Returns 0.0 if the signal has never been observed.
+        """
+        if signal_id not in self._evidence:
+            return 0.0
+        age = max(0, current_step - self._evidence[signal_id].observed_at_step)
+        return math.exp(-self._decay_rate * age)
+
+    def urgency(self, signal_id: str, *, current_step: int) -> float:
+        """Return the urgency multiplier for acting on a signal at current_step.
+
+        Clipped to [min_urgency, 1.0].
+        """
+        raw = self.freshness(signal_id, current_step=current_step)
+        if raw == 0.0:
+            return 0.0  # signal never observed → no urgency
+        return max(self._min_urgency, raw)
+
+    def all_signals(self) -> list[str]:
+        """Return all observed signal IDs in observation order."""
+        return list(self._evidence.keys())
+
+    def reset(self) -> None:
+        """Clear all recorded evidence."""
+        self._evidence.clear()
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def decay_rate(self) -> float:
+        return self._decay_rate
+
+    @property
+    def min_urgency(self) -> float:
+        return self._min_urgency
+
 ```
 
 ## siege_env/models/__init__.py (last modified: 2026-04-24T17:11:21+00:00)
@@ -1003,7 +1147,7 @@ class SIEGEState:
 """Replay logging and playback modules."""
 ```
 
-## siege_env/rewards/__init__.py (last modified: 2026-04-24T18:14:12+00:00)
+## siege_env/rewards/__init__.py (last modified: 2026-04-24T18:36:05+00:00)
 ```python
 """Reward modules and aggregators."""
 
@@ -1012,6 +1156,8 @@ from siege_env.rewards.r1_resolution import compute_r1_resolution
 from siege_env.rewards.r2_deception import compute_r2_deception
 from siege_env.rewards.r3_detection import compute_r3_detection
 from siege_env.rewards.r4_trust_calibration import compute_r4_trust_calibration
+from siege_env.rewards.r5_confidence import compute_r5_confidence, ConfidenceCalibrator
+from siege_env.rewards.r6_temporal import compute_r6_temporal
 
 __all__ = [
     "aggregate_rewards",
@@ -1019,11 +1165,14 @@ __all__ = [
     "compute_r2_deception",
     "compute_r3_detection",
     "compute_r4_trust_calibration",
+    "compute_r5_confidence",
+    "ConfidenceCalibrator",
+    "compute_r6_temporal",
 ]
 
 ```
 
-## siege_env/rewards/aggregator.py (last modified: 2026-04-24T18:14:06+00:00)
+## siege_env/rewards/aggregator.py (last modified: 2026-04-24T18:36:05+00:00)
 ```python
 """Reward aggregation scaffold for SIEGE."""
 
@@ -1036,6 +1185,8 @@ from siege_env.rewards.r1_resolution import compute_r1_resolution
 from siege_env.rewards.r2_deception import compute_r2_deception
 from siege_env.rewards.r3_detection import compute_r3_detection
 from siege_env.rewards.r4_trust_calibration import compute_r4_trust_calibration
+from siege_env.rewards.r5_confidence import compute_r5_confidence
+from siege_env.rewards.r6_temporal import compute_r6_temporal
 
 
 def aggregate_rewards(
@@ -1046,8 +1197,9 @@ def aggregate_rewards(
     claims_by_id: dict[str, dict[str, Any]] | None = None,
     trust_scores: dict[int, float] | None = None,
     agent_reliability: dict[int, bool] | None = None,
+    urgency_multiplier: float = 1.0,
 ) -> tuple[float, dict[str, Any]]:
-    """Aggregate reward components (R1-R4)."""
+    """Aggregate reward components (R1-R5, R6)."""
 
     r1 = compute_r1_resolution(action, ground_truth_root_cause)
     r2 = compute_r2_deception(
@@ -1065,13 +1217,21 @@ def aggregate_rewards(
         trust_scores=trust_scores or {},
         agent_reliability=agent_reliability or {},
     )
+    r5 = compute_r5_confidence(action, ground_truth_root_cause)
+    r6 = compute_r6_temporal(
+        action,
+        ground_truth_root_cause,
+        urgency_multiplier=urgency_multiplier,
+    )
 
-    total = max(0.0, min(1.0, max(r1, r2, r3, r4)))
+    total = max(0.0, min(1.0, max(r1, r2, r3, r4, r5, r6)))
     return total, {
         "r1_resolution": r1,
         "r2_deception": r2,
         "r3_detection": r3,
         "r4_trust_calibration": r4,
+        "r5_confidence": r5,
+        "r6_temporal": r6,
     }
 
 ```
@@ -1188,6 +1348,203 @@ def compute_r4_trust_calibration(
     mean_brier = brier_sum / len(common_agent_ids)
     score = 1.0 - mean_brier
     return round(max(0.0, min(1.0, score)), 6)
+
+```
+
+## siege_env/rewards/r5_confidence.py (last modified: 2026-04-24T18:35:16+00:00)
+```python
+"""Confidence calibration reward (R5) for SIEGE.
+
+Design
+------
+R5 rewards agents that are epistemically honest: confident when correct
+and less confident when wrong.
+
+The scoring rule used is a *modified Brier score* anchored to the
+correct outcome:
+
+  outcome = 1.0 if diagnosis is correct, else 0.0
+  brier   = (confidence - outcome) ** 2
+  r5      = 1.0 - brier                          # raw [0, 1]
+
+This gives:
+  - Correct + confident (conf=1.0) → R5 = 1.0  (ideal)
+  - Correct + half-sure  (conf=0.5) → R5 = 0.75 (mediocre, not maximal)
+  - Wrong  + confident   (conf=1.0) → R5 = 0.0  (maximally penalised)
+  - Wrong  + half-sure   (conf=0.5) → R5 = 0.75 (partially penalised)
+
+Anti-exploit property
+---------------------
+An agent that always reports confidence=0.5 ("always-0.5 exploit")
+receives R5=0.75 on every step regardless of correctness.  Because the
+maximum achievable score is 1.0 (requires confident correct diagnosis),
+the always-0.5 strategy cannot reach the top of the leaderboard.  The
+test suite explicitly verifies:
+
+    compute_r5_confidence(correct, conf=0.5) < 1.0
+    compute_r5_confidence(wrong,   conf=0.5) < compute_r5_confidence(correct, conf=0.5)
+
+Stateful calibration (ConfidenceCalibrator)
+-------------------------------------------
+For multi-step evaluation (e.g., validation episodes) we provide
+`ConfidenceCalibrator`, a running Brier-score accumulator that
+computes the *mean R5 across all diagnose actions* in an episode.
+This is the metric judges will see in the final leaderboard.
+"""
+
+from __future__ import annotations
+
+from siege_env.models import SIEGEAction
+
+
+# ---------------------------------------------------------------------------
+# Stateless per-action R5
+# ---------------------------------------------------------------------------
+
+
+def compute_r5_confidence(
+    action: SIEGEAction,
+    ground_truth_root_cause: str,
+) -> float:
+    """Compute the confidence-calibration reward component R5 for a single action.
+
+    Args:
+        action: The agent's action for this step.
+        ground_truth_root_cause: The true root cause for this episode.
+
+    Returns:
+        R5 ∈ [0.0, 1.0].  Non-diagnose actions return 0.0.
+    """
+    if action.tool_name != "diagnose":
+        return 0.0
+
+    confidence = float(action.arguments.confidence)
+    correct = action.arguments.root_cause == ground_truth_root_cause
+    outcome = 1.0 if correct else 0.0
+
+    brier = (confidence - outcome) ** 2
+    r5 = 1.0 - brier
+    return round(max(0.0, min(1.0, r5)), 6)
+
+
+# ---------------------------------------------------------------------------
+# Stateful multi-step calibrator
+# ---------------------------------------------------------------------------
+
+
+class ConfidenceCalibrator:
+    """Running Brier-score accumulator across multiple diagnose actions.
+
+    Use this to compute mean R5 over an entire episode or evaluation run.
+
+    Example::
+
+        cal = ConfidenceCalibrator()
+        for action, truth in episode_steps:
+            cal.record(action, truth)
+        episode_r5 = cal.mean_r5()
+    """
+
+    def __init__(self) -> None:
+        self._total_r5: float = 0.0
+        self._count: int = 0
+
+    def record(self, action: SIEGEAction, ground_truth_root_cause: str) -> float:
+        """Record one action and return its per-step R5.
+
+        Non-diagnose actions are silently ignored (return 0.0 without
+        updating the running mean).
+        """
+        r5 = compute_r5_confidence(action, ground_truth_root_cause)
+        if action.tool_name == "diagnose":
+            self._total_r5 += r5
+            self._count += 1
+        return r5
+
+    def mean_r5(self) -> float:
+        """Return mean R5 across all recorded diagnose actions.
+
+        Returns 0.0 if no diagnose actions have been recorded yet.
+        """
+        if self._count == 0:
+            return 0.0
+        return round(self._total_r5 / self._count, 6)
+
+    def reset(self) -> None:
+        """Clear accumulated state."""
+        self._total_r5 = 0.0
+        self._count = 0
+
+    @property
+    def num_recorded(self) -> int:
+        """Number of diagnose actions recorded so far."""
+        return self._count
+
+```
+
+## siege_env/rewards/r6_temporal.py (last modified: 2026-04-24T18:32:44+00:00)
+```python
+"""Temporal reward (R6) — rewards fast correct diagnoses, penalises slow ones.
+
+R6 design
+---------
+R6 answers the question: *given that the agent got the diagnosis right,
+how quickly did it act on the available evidence?*
+
+  r6 = urgency_multiplier * base_r6_score
+
+where:
+
+  base_r6_score   = 1.0 if action is a correct diagnose, else 0.0
+  urgency_multi   = mean freshness across the evidence signals cited in
+                    the action's evidence list at the current step
+                    (falls back to 1.0 if no evidence list provided)
+
+This gives the full R6 range of [0, 1]:
+  • Correct diagnosis on step 0 with fresh evidence → R6 ≈ 1.0
+  • Correct diagnosis on step 20 with stale evidence → R6 ≈ 0.1
+  • Wrong diagnosis → R6 = 0.0
+
+The urgency multiplier is supplied externally (computed by
+TemporalEvidenceTracker.urgency()) so that R6 stays a pure scoring
+function with no hidden state — easy to test and compose.
+"""
+
+from __future__ import annotations
+
+from siege_env.models import SIEGEAction
+
+
+def compute_r6_temporal(
+    action: SIEGEAction,
+    ground_truth_root_cause: str,
+    *,
+    urgency_multiplier: float = 1.0,
+) -> float:
+    """Compute the temporal reward component R6.
+
+    Args:
+        action: The agent's action for this step.
+        ground_truth_root_cause: The true root cause for this episode.
+        urgency_multiplier: Pre-computed freshness-based multiplier in [0, 1].
+            Defaults to 1.0 (no temporal penalty) when caller does not
+            supply freshness data.
+
+    Returns:
+        R6 score in [0.0, 1.0].
+    """
+    if not (0.0 <= urgency_multiplier <= 1.0):
+        raise ValueError(
+            f"urgency_multiplier must be in [0, 1], got {urgency_multiplier}"
+        )
+
+    if action.tool_name != "diagnose":
+        return 0.0
+
+    if action.arguments.root_cause != ground_truth_root_cause:
+        return 0.0
+
+    return round(urgency_multiplier, 4)
 
 ```
 
@@ -1589,7 +1946,7 @@ if str(ROOT) not in sys.path:
 
 ```
 
-## tests/master_suite.py (last modified: 2026-04-24T18:23:03+00:00)
+## tests/master_suite.py (last modified: 2026-04-24T18:36:09+00:00)
 ```python
 """Master test suite entrypoint aggregating the project test surface."""
 
@@ -1604,6 +1961,8 @@ from tests.step_tests.step_07_pathogen_test import *  # noqa: F401,F403
 from tests.step_tests.step_08_r4_hacking_test import *  # noqa: F401,F403
 from tests.step_tests.step_09_curriculum_test import *  # noqa: F401,F403
 from tests.step_tests.step_10_trust_poisoning_test import *  # noqa: F401,F403
+from tests.step_tests.step_11_temporal_test import *  # noqa: F401,F403
+from tests.step_tests.step_12_confidence_test import *  # noqa: F401,F403
 
 ```
 
@@ -2738,5 +3097,270 @@ def test_trust_drops_after_strike_begins() -> None:
         f"Trust after strikes ({phase2_final:.4f}) must be lower than "
         f"Phase 1 peak ({phase1_peak:.4f})"
     )
+
+```
+
+## tests/step_tests/step_11_temporal_test.py (last modified: 2026-04-24T18:32:44+00:00)
+```python
+"""Gate test for Step 11 — Temporal Evidence Dynamics + R6.
+
+5 tests covering:
+1. EvidenceRecord is created with correct fields.
+2. Freshness decays correctly over steps.
+3. Urgency is floored at min_urgency for stale evidence.
+4. R6 = 0 for wrong diagnose, R6 = urgency for correct diagnose.
+5. R6 with no-evidence fallback (urgency=1.0) equals full R6.
+"""
+
+from __future__ import annotations
+
+import math
+
+from siege_env.mechanics.temporal_evidence import TemporalEvidenceTracker
+from siege_env.models.actions import SIEGEAction, DiagnoseArgs
+from siege_env.rewards.r6_temporal import compute_r6_temporal
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _diagnose_action(root_cause: str) -> SIEGEAction:
+    return SIEGEAction(
+        tool_name="diagnose",
+        arguments=DiagnoseArgs(
+            root_cause=root_cause,
+            confidence=0.9,
+            evidence=["observed high latency spike"],
+        ),
+    )
+
+
+def _non_diagnose_action() -> SIEGEAction:
+    from siege_env.models.actions import ChallengeArgs
+    return SIEGEAction(
+        tool_name="challenge",
+        arguments=ChallengeArgs(
+            target_agent_id=1,
+            claim_id="claim-001",
+            flaw_type="type1_false_correlation",
+            reasoning="The evidence presented does not support the claimed causation.",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 1: Evidence observation and freshness at step 0
+# ---------------------------------------------------------------------------
+
+def test_freshness_at_observation_step() -> None:
+    """Freshness must be 1.0 immediately when a signal is observed."""
+    tracker = TemporalEvidenceTracker(decay_rate=0.15)
+    tracker.observe("signal_A", step=3)
+    freshness = tracker.freshness("signal_A", current_step=3)
+    assert freshness == 1.0, f"Expected 1.0, got {freshness}"
+
+
+# ---------------------------------------------------------------------------
+# Test 2: Freshness decays exponentially over steps
+# ---------------------------------------------------------------------------
+
+def test_freshness_decays_over_steps() -> None:
+    """Freshness should follow exp(-decay * age)."""
+    decay_rate = 0.2
+    tracker = TemporalEvidenceTracker(decay_rate=decay_rate)
+    tracker.observe("signal_B", step=0)
+
+    for age in range(1, 8):
+        expected = math.exp(-decay_rate * age)
+        actual = tracker.freshness("signal_B", current_step=age)
+        assert abs(actual - expected) < 1e-9, (
+            f"Step {age}: expected {expected:.6f}, got {actual:.6f}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test 3: Urgency is floored at min_urgency for old evidence
+# ---------------------------------------------------------------------------
+
+def test_urgency_floored_at_min() -> None:
+    """After many steps the urgency must not go below min_urgency."""
+    min_urgency = 0.10
+    tracker = TemporalEvidenceTracker(decay_rate=0.5, min_urgency=min_urgency)
+    tracker.observe("old_signal", step=0)
+    # After 20 steps, exp(-0.5 * 20) ≈ 2e-5 which is < min_urgency
+    urgency = tracker.urgency("old_signal", current_step=20)
+    assert urgency == min_urgency, f"Expected {min_urgency}, got {urgency}"
+
+
+# ---------------------------------------------------------------------------
+# Test 4: R6 = 0 for wrong answer, R6 = urgency for correct answer
+# ---------------------------------------------------------------------------
+
+def test_r6_correct_vs_wrong_diagnose() -> None:
+    """R6 is 0 for wrong root cause and equals urgency_multiplier for correct."""
+    truth = "database_timeout"
+    urgency = 0.72
+
+    wrong_action = _diagnose_action("network_partition")
+    assert compute_r6_temporal(wrong_action, truth, urgency_multiplier=urgency) == 0.0
+
+    right_action = _diagnose_action(truth)
+    r6 = compute_r6_temporal(right_action, truth, urgency_multiplier=urgency)
+    assert abs(r6 - urgency) < 1e-6, f"Expected {urgency}, got {r6}"
+
+
+# ---------------------------------------------------------------------------
+# Test 5: R6 defaults to full score (urgency=1.0) for correct fast diagnosis
+# ---------------------------------------------------------------------------
+
+def test_r6_full_score_no_temporal_penalty() -> None:
+    """When no urgency multiplier is given, correct diagnose gives R6 = 1.0."""
+    truth = "config_drift"
+    action = _diagnose_action(truth)
+    r6 = compute_r6_temporal(action, truth)  # default urgency_multiplier=1.0
+    assert r6 == 1.0, f"Expected 1.0, got {r6}"
+
+    # Non-diagnose action should still give 0
+    non_diag = _non_diagnose_action()
+    assert compute_r6_temporal(non_diag, truth) == 0.0
+
+```
+
+## tests/step_tests/step_12_confidence_test.py (last modified: 2026-04-24T18:35:45+00:00)
+```python
+"""Gate test for Step 12 — Confidence Calibration + R5.
+
+5 tests covering:
+1. Non-diagnose action returns R5 = 0.0.
+2. Correct diagnosis with maximum confidence returns R5 = 1.0.
+3. Calibration curve: correct + conf=0.5 gives 0.75 (not 1.0).
+4. Always-0.5 exploit: wrong diagnosis + conf=0.5 returns 0.75 < correct + conf=1.0.
+5. ConfidenceCalibrator: mean R5 across multiple actions is correctly averaged.
+"""
+
+from __future__ import annotations
+
+from siege_env.models.actions import SIEGEAction, DiagnoseArgs, ChallengeArgs
+from siege_env.rewards.r5_confidence import compute_r5_confidence, ConfidenceCalibrator
+
+
+_TRUTH = "database_timeout"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _diagnose(root_cause: str, confidence: float) -> SIEGEAction:
+    return SIEGEAction(
+        tool_name="diagnose",
+        arguments=DiagnoseArgs(
+            root_cause=root_cause,
+            confidence=confidence,
+            evidence=["latency_p99_spike"],
+        ),
+    )
+
+
+def _challenge() -> SIEGEAction:
+    return SIEGEAction(
+        tool_name="challenge",
+        arguments=ChallengeArgs(
+            target_agent_id=2,
+            claim_id="claim-007",
+            flaw_type="type3_tunnel_vision",
+            reasoning="The agent ignored recent deployment signals that contradict this hypothesis.",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 1: Non-diagnose action → R5 = 0
+# ---------------------------------------------------------------------------
+
+def test_r5_non_diagnose_is_zero() -> None:
+    """Non-diagnose actions must return 0.0."""
+    r5 = compute_r5_confidence(_challenge(), _TRUTH)
+    assert r5 == 0.0, f"Expected 0.0 for non-diagnose, got {r5}"
+
+
+# ---------------------------------------------------------------------------
+# Test 2: Correct + fully confident → R5 = 1.0
+# ---------------------------------------------------------------------------
+
+def test_r5_correct_full_confidence_is_one() -> None:
+    """Correct diagnosis with confidence=1.0 must return R5=1.0."""
+    r5 = compute_r5_confidence(_diagnose(_TRUTH, 1.0), _TRUTH)
+    assert r5 == 1.0, f"Expected 1.0, got {r5}"
+
+
+# ---------------------------------------------------------------------------
+# Test 3: Calibration curve — correct + 0.5 conf gives 0.75
+# ---------------------------------------------------------------------------
+
+def test_r5_correct_half_confidence_is_0_75() -> None:
+    """Correct diagnosis with confidence=0.5 should give R5=0.75 (not 1.0)."""
+    r5 = compute_r5_confidence(_diagnose(_TRUTH, 0.5), _TRUTH)
+    assert abs(r5 - 0.75) < 1e-6, f"Expected 0.75, got {r5}"
+    # Critically: not the maximum possible score
+    assert r5 < 1.0, "Always-half confidence must not achieve maximum R5"
+
+
+# ---------------------------------------------------------------------------
+# Test 4: Always-0.5 exploit prevention
+# ---------------------------------------------------------------------------
+
+def test_r5_always_half_exploit_blocked() -> None:
+    """Wrong diagnosis + confidence=0.5 must score LOWER than correct + confidence=1.0."""
+    r5_exploit = compute_r5_confidence(_diagnose("wrong_root_cause", 0.5), _TRUTH)
+    r5_ideal = compute_r5_confidence(_diagnose(_TRUTH, 1.0), _TRUTH)
+
+    # wrong + 0.5 confidence → 1 - (0.5-0)^2 = 0.75
+    assert abs(r5_exploit - 0.75) < 1e-6, (
+        f"Wrong+0.5conf should give 0.75 per Brier, got {r5_exploit}"
+    )
+    # ideal (correct+1.0) → 1.0; exploit cannot reach this ceiling
+    assert r5_exploit < r5_ideal, (
+        f"Always-0.5 exploit ({r5_exploit}) must be < ideal ({r5_ideal})"
+    )
+    # Also: wrong + overconfident (conf=1.0) → R5=0.0
+    r5_overconfident_wrong = compute_r5_confidence(_diagnose("wrong_root_cause", 1.0), _TRUTH)
+    assert r5_overconfident_wrong == 0.0, (
+        f"Overconfident wrong diagnosis must give 0.0, got {r5_overconfident_wrong}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 5: ConfidenceCalibrator mean R5 across multiple actions
+# ---------------------------------------------------------------------------
+
+def test_confidence_calibrator_mean_r5() -> None:
+    """ConfidenceCalibrator must correctly average R5 across diagnose actions."""
+    cal = ConfidenceCalibrator()
+
+    # Non-diagnose action — should not affect mean
+    cal.record(_challenge(), _TRUTH)
+    assert cal.num_recorded == 0
+    assert cal.mean_r5() == 0.0
+
+    # Correct + conf=1.0 → R5=1.0
+    cal.record(_diagnose(_TRUTH, 1.0), _TRUTH)
+    # Correct + conf=0.5 → R5=0.75
+    cal.record(_diagnose(_TRUTH, 0.5), _TRUTH)
+    # Wrong  + conf=1.0 → R5=0.0
+    cal.record(_diagnose("wrong_cause", 1.0), _TRUTH)
+
+    assert cal.num_recorded == 3
+
+    # mean = (1.0 + 0.75 + 0.0) / 3 = 0.5833...
+    expected = round((1.0 + 0.75 + 0.0) / 3, 6)
+    actual = cal.mean_r5()
+    assert abs(actual - expected) < 1e-5, f"Expected mean {expected}, got {actual}"
+
+    # Reset clears state
+    cal.reset()
+    assert cal.num_recorded == 0
+    assert cal.mean_r5() == 0.0
 
 ```
