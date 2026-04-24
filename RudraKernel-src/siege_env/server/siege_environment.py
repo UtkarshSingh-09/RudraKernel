@@ -318,3 +318,29 @@ def _build_observation_with_red_herrings(self: SIEGEEnvironment, *, template, ac
 
 
 SIEGEEnvironment._build_observation = _build_observation_with_red_herrings
+
+# Step 18 append-only integration: severity escalation binding for R8 + obs metadata
+from siege_env.mechanics.severity_escalation import compute_incident_severity
+
+_ORIG_STEP_STEP18 = SIEGEEnvironment.step
+_ORIG_BUILD_OBS_STEP18 = SIEGEEnvironment._build_observation
+
+
+def _step_with_severity_r8(self: SIEGEEnvironment, action_payload):
+    obs, reward, done, info = _ORIG_STEP_STEP18(self, action_payload)
+    severity = compute_incident_severity(obs.step_number)
+    info = dict(info)
+    info["incident_severity"] = severity
+    return obs, reward, done, info
+
+
+def _build_observation_with_severity(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP18(self, template=template, action_error=action_error)
+    severity = compute_incident_severity(obs.step_number)
+    obs.incident_severity = severity
+    obs.incident_dashboard["severity_score"] = {"warning": 0.3, "critical": 0.7, "outage": 1.0}[severity]
+    return obs
+
+
+SIEGEEnvironment.step = _step_with_severity_r8
+SIEGEEnvironment._build_observation = _build_observation_with_severity

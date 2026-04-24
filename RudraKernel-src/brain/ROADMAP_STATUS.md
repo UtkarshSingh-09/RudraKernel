@@ -18,3 +18,4 @@
 | 15 | Information Asymmetry | Ankit | ✅ | PASS | 2026-04-24 |
 | 16 | Whisper / Private Channels | Ankit | ✅ | PASS | 2026-04-24 |
 | 17 | Red Herrings + R9 | Ankit | ✅ | PASS | 2026-04-24 |
+| 18 | Severity Escalation + R8 | Ankit | ✅ | PASS | 2026-04-24 |

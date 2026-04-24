@@ -36,3 +36,9 @@
 - Gate test: PASS (5/5)
 - Master suite: PASS (123 passed, 2 skipped)
 - Status: Correlation challenge reward and red-herring surface integrated.
+
+## Step 18 Update (2026-04-24T19:39:10Z)
+- Latest step touched: 18 - Severity Escalation + R8
+- Gate test: PASS (5/5)
+- Master suite: PASS (128 passed, 2 skipped)
+- Status: Severity-aware escalation signals and R8 reward component integrated.

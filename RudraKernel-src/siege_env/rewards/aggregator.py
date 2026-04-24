@@ -92,3 +92,35 @@ def aggregate_rewards(
     components["r9_correlation"] = r9
     total = max(0.0, min(1.0, max(base_total, r9)))
     return total, components
+
+# Step 18 append-only extension: include R8 severity-speed reward
+from siege_env.rewards.r8_severity_speed import compute_r8_severity_speed
+
+_ORIGINAL_AGGREGATE_REWARDS_STEP18 = aggregate_rewards
+
+
+def aggregate_rewards(
+    action: SIEGEAction,
+    *,
+    ground_truth_root_cause: str,
+    seat_role: str = "immune",
+    claims_by_id: dict[str, dict[str, Any]] | None = None,
+    trust_scores: dict[int, float] | None = None,
+    agent_reliability: dict[int, bool] | None = None,
+    urgency_multiplier: float = 1.0,
+    incident_severity: str = "warning",
+) -> tuple[float, dict[str, Any]]:
+    base_total, components = _ORIGINAL_AGGREGATE_REWARDS_STEP18(
+        action,
+        ground_truth_root_cause=ground_truth_root_cause,
+        seat_role=seat_role,
+        claims_by_id=claims_by_id,
+        trust_scores=trust_scores,
+        agent_reliability=agent_reliability,
+        urgency_multiplier=urgency_multiplier,
+    )
+    r8 = compute_r8_severity_speed(action, incident_severity=incident_severity)
+    components = dict(components)
+    components["r8_severity_speed"] = r8
+    total = max(0.0, min(1.0, max(base_total, r8)))
+    return total, components

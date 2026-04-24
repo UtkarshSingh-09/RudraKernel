@@ -18,3 +18,4 @@ from tests.step_tests.step_14_templates_expansion_test import *  # noqa: F401,F4
 from tests.step_tests.step_15_info_asymmetry_test import *  # noqa: F401,F403
 from tests.step_tests.step_16_whisper_test import *  # noqa: F401,F403
 from tests.step_tests.step_17_red_herrings_r9_test import *  # noqa: F401,F403
+from tests.step_tests.step_18_severity_r8_test import *  # noqa: F401,F403
