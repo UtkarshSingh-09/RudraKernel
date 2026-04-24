@@ -1,0 +1,9 @@
+:root {
+  --rk-bg: #f3f7fb;
+  --rk-panel: #ffffff;
+  --rk-ink: #0f2233;
+  --rk-accent: #0078a8;
+}
+body { background: linear-gradient(120deg, #e7f3ff, #f8fbff); }
+.rk-title { color: var(--rk-ink); font-weight: 700; letter-spacing: .02em; }
+.rk-note { color: #2b4f68; }
