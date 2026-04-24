@@ -168,3 +168,48 @@ class SIEGEEnvironment(MCPEnvironment):
             seat_agent_id=0,
             action_error=action_error,
         )
+
+# Step 13 append-only integration: epistemic cascade metadata
+from siege_env.mechanics.cascade import EpistemicCascadeEngine
+
+_ORIG_STEP_STEP13 = SIEGEEnvironment.step
+_ORIG_BUILD_OBS_STEP13 = SIEGEEnvironment._build_observation
+
+
+def _step_with_cascade(self: SIEGEEnvironment, action_payload):
+    if not hasattr(self, "_cascade_engine"):
+        self._cascade_engine = EpistemicCascadeEngine()
+        self._last_cascade_snapshot = {
+            "mean_confidence": 0.0,
+            "herd_strength": 0.0,
+            "triggered": False,
+        }
+
+    obs, reward, done, info = _ORIG_STEP_STEP13(self, action_payload)
+    claims = getattr(self, "_agent_claims", []) or []
+    confidences = [float(c.get("confidence", 0.0)) for c in claims]
+    snapshot = self._cascade_engine.evaluate(confidences)
+    self._last_cascade_snapshot = {
+        "mean_confidence": snapshot.mean_confidence,
+        "herd_strength": snapshot.herd_strength,
+        "triggered": snapshot.triggered,
+    }
+    info = dict(info)
+    info["cascade"] = dict(self._last_cascade_snapshot)
+    return obs, reward, done, info
+
+
+def _build_observation_with_cascade(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP13(self, template=template, action_error=action_error)
+    if not hasattr(self, "_last_cascade_snapshot"):
+        self._last_cascade_snapshot = {
+            "mean_confidence": 0.0,
+            "herd_strength": 0.0,
+            "triggered": False,
+        }
+    obs.incident_dashboard["cascade"] = dict(self._last_cascade_snapshot)
+    return obs
+
+
+SIEGEEnvironment.step = _step_with_cascade
+SIEGEEnvironment._build_observation = _build_observation_with_cascade

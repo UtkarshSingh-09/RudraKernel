@@ -13,3 +13,4 @@
 | 10 | Trust Poisoning Strategy | Utkarsh | ✅ | PASS | 2026-04-24 |
 | 11 | Temporal Evidence Dynamics + R6 | Utkarsh | ✅ | PASS | 2026-04-24 |
 | 12 | Confidence Calibration + R5 | Utkarsh | ✅ | PASS | 2026-04-24 |
+| 13 | Epistemic Cascade Failures | Ankit | ✅ | PASS | 2026-04-24 |

@@ -13,3 +13,4 @@ from tests.step_tests.step_09_curriculum_test import *  # noqa: F401,F403
 from tests.step_tests.step_10_trust_poisoning_test import *  # noqa: F401,F403
 from tests.step_tests.step_11_temporal_test import *  # noqa: F401,F403
 from tests.step_tests.step_12_confidence_test import *  # noqa: F401,F403
+from tests.step_tests.step_13_cascade_test import *  # noqa: F401,F403
