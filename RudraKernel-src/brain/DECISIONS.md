@@ -41,3 +41,18 @@ Decision:
 Consequences:
 - Step 03 remains stable, predictable, and easy to test.
 - Step 14 can expand from this contract without breaking early-phase behavior.
+
+## ADR-003: Step 04 uses MCPEnvironment-compatible minimal loop with graceful invalid actions
+Status: Accepted
+
+Context:
+- Step 04 needs a working `reset/step/state` loop with R1 reward only.
+- Local test environments may not always have OpenEnv installed.
+
+Decision:
+- Implement `SIEGEEnvironment(MCPEnvironment)` with a local fallback base if `openenv` import is unavailable.
+- Keep invalid actions non-fatal: return `action_error` observation + reward `-0.05` and continue until terminal criteria.
+
+Consequences:
+- Step 04 remains aligned with MCP-first architecture and is testable in constrained local environments.
+- Later steps can replace the fallback path without changing environment behavior contracts.

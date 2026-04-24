@@ -1,14 +1,15 @@
-# MASTER CODE - Last Updated: 2026-04-24T17:23:28+00:00
+# MASTER CODE - Last Updated: 2026-04-24T17:53:09+00:00
 
-# Files Tracked: 26
+# Files Tracked: 30
 
-## siege_env/__init__.py (last modified: 2026-04-24T17:14:18+00:00)
+## siege_env/__init__.py (last modified: 2026-04-24T17:52:44+00:00)
 ```python
 """SIEGE environment package."""
 
 from siege_env.models import SIEGEAction, SIEGEObservation, SIEGEState
+from siege_env.server import SIEGEEnvironment
 
-__all__ = ["SIEGEAction", "SIEGEObservation", "SIEGEState"]
+__all__ = ["SIEGEAction", "SIEGEEnvironment", "SIEGEObservation", "SIEGEState"]
 
 ```
 
@@ -543,17 +544,75 @@ class SIEGEState:
 """Replay logging and playback modules."""
 ```
 
-## siege_env/rewards/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
+## siege_env/rewards/__init__.py (last modified: 2026-04-24T17:52:36+00:00)
 ```python
 """Reward modules and aggregators."""
+
+from siege_env.rewards.aggregator import aggregate_rewards
+from siege_env.rewards.r1_resolution import compute_r1_resolution
+
+__all__ = ["aggregate_rewards", "compute_r1_resolution"]
+
 ```
 
-## siege_env/server/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
+## siege_env/rewards/aggregator.py (last modified: 2026-04-24T17:51:49+00:00)
+```python
+"""Reward aggregation scaffold for SIEGE."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from siege_env.models import SIEGEAction
+from siege_env.rewards.r1_resolution import compute_r1_resolution
+
+
+def aggregate_rewards(
+    action: SIEGEAction,
+    *,
+    ground_truth_root_cause: str,
+) -> tuple[float, dict[str, Any]]:
+    """Aggregate reward components (Step 04 uses only R1)."""
+
+    r1 = compute_r1_resolution(action, ground_truth_root_cause)
+    total = max(0.0, min(1.0, r1))
+    return total, {"r1_resolution": r1}
+
+```
+
+## siege_env/rewards/r1_resolution.py (last modified: 2026-04-24T17:51:44+00:00)
+```python
+"""Resolution reward (R1) for minimal Step 04 environment loop."""
+
+from __future__ import annotations
+
+from siege_env.models import SIEGEAction
+
+
+def compute_r1_resolution(action: SIEGEAction, ground_truth_root_cause: str) -> float:
+    """Return 1.0 for correct diagnose action, otherwise 0.0."""
+
+    if action.tool_name != "diagnose":
+        return 0.0
+
+    predicted_root_cause = action.arguments.root_cause
+    if predicted_root_cause == ground_truth_root_cause:
+        return 1.0
+    return 0.0
+
+```
+
+## siege_env/server/__init__.py (last modified: 2026-04-24T17:52:40+00:00)
 ```python
 """Server modules for SIEGE environment."""
+
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+__all__ = ["SIEGEEnvironment"]
+
 ```
 
-## siege_env/server/app.py (last modified: 2026-04-24T17:20:36+00:00)
+## siege_env/server/app.py (last modified: 2026-04-24T17:52:48+00:00)
 ```python
 """FastAPI server scaffold for SIEGE Step 01."""
 
@@ -561,14 +620,173 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from siege_env.server.siege_environment import SIEGEEnvironment
+
 
 app = FastAPI(title="SIEGE Environment", version="0.1.0")
+env = SIEGEEnvironment(seed=7)
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
     """Basic liveness endpoint used for local and container smoke tests."""
     return {"status": "ok"}
+
+
+@app.get("/env/reset")
+def reset() -> dict[str, object]:
+    """Reset the minimal environment and return the starting observation."""
+    observation = env.reset()
+    return {"observation": observation.to_dict()}
+
+```
+
+## siege_env/server/siege_environment.py (last modified: 2026-04-24T17:52:32+00:00)
+```python
+"""Minimal Step 04 SIEGE environment implementation."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from random import Random
+from typing import Any
+from uuid import uuid4
+
+from pydantic import ValidationError
+
+from siege_env.incidents import load_templates
+from siege_env.models import SIEGEAction, SIEGEObservation, SIEGEState
+from siege_env.rewards.aggregator import aggregate_rewards
+
+try:
+    from openenv import MCPEnvironment
+except ImportError:  # pragma: no cover - fallback for local development.
+    class MCPEnvironment:  # type: ignore[no-redef]
+        """Fallback base when OpenEnv is not installed in local test environments."""
+
+
+class SIEGEEnvironment(MCPEnvironment):
+    """Single-seat SIEGE environment with minimal R1 reward loop."""
+
+    def __init__(self, *, seed: int = 0, max_steps: int = 5) -> None:
+        self._rng = Random(seed)
+        self._max_steps = max_steps
+        self._templates = load_templates()
+        self._state: SIEGEState | None = None
+        self._agent_claims: list[dict[str, Any]] = []
+        self._done = False
+        self._last_reward_components: dict[str, Any] = {"r1_resolution": 0.0}
+
+    def reset(self) -> SIEGEObservation:
+        template = self._rng.choice(self._templates)
+        episode_id = f"episode-{uuid4().hex[:8]}"
+        self._state = SIEGEState(
+            episode_id=episode_id,
+            step_count=0,
+            incident_template_id=template["id"],
+            ground_truth_root_cause=template["root_cause"],
+            current_tier=1,
+            arms_race_score=0.0,
+        )
+        self._agent_claims = []
+        self._done = False
+        self._last_reward_components = {"r1_resolution": 0.0}
+        return self._build_observation(template=template, action_error=None)
+
+    def step(self, action_payload: SIEGEAction | dict[str, Any]) -> tuple[SIEGEObservation, float, bool, dict[str, Any]]:
+        if self._state is None:
+            raise RuntimeError("Environment not initialized. Call reset() before step().")
+
+        template = self._template_by_id(self._state.incident_template_id)
+        if self._done:
+            observation = self._build_observation(template=template, action_error=None)
+            return observation, 0.0, True, {"already_done": True}
+
+        self._state = replace(self._state, step_count=self._state.step_count + 1)
+
+        try:
+            action = SIEGEAction.model_validate(action_payload)
+        except ValidationError as exc:
+            self._done = self._state.step_count >= self._max_steps
+            observation = self._build_observation(template=template, action_error=str(exc))
+            return observation, -0.05, self._done, {"invalid_action": True}
+
+        reward, components = aggregate_rewards(
+            action,
+            ground_truth_root_cause=self._state.ground_truth_root_cause,
+        )
+        self._last_reward_components = components
+
+        if action.tool_name == "diagnose":
+            self._agent_claims.append(
+                {
+                    "agent_id": 0,
+                    "claim_id": f"claim-{self._state.step_count:03d}",
+                    "root_cause": action.arguments.root_cause,
+                }
+            )
+
+        self._done = (action.tool_name == "diagnose" and reward == 1.0) or (
+            self._state.step_count >= self._max_steps
+        )
+        observation = self._build_observation(template=template, action_error=None)
+        info = {"invalid_action": False, "reward_components": components}
+        return observation, reward, self._done, info
+
+    def state(self) -> SIEGEState:
+        if self._state is None:
+            raise RuntimeError("Environment not initialized. Call reset() before state().")
+        return self._state
+
+    def _template_by_id(self, template_id: str) -> dict[str, Any]:
+        for template in self._templates:
+            if template["id"] == template_id:
+                return template
+        raise RuntimeError(f"Template '{template_id}' not found.")
+
+    def _build_observation(self, *, template: dict[str, Any], action_error: str | None) -> SIEGEObservation:
+        if self._state is None:
+            raise RuntimeError("Environment not initialized.")
+
+        if self._state.step_count <= 1:
+            severity = "warning"
+        elif self._state.step_count <= 3:
+            severity = "critical"
+        else:
+            severity = "outage"
+
+        visible_signals = template["observable_signals"][: max(1, min(len(template["observable_signals"]), self._state.step_count + 1))]
+        available_evidence = [{"type": "signal", "value": signal} for signal in visible_signals]
+        active_status = "resolved" if self._done else "active"
+
+        return SIEGEObservation(
+            incident_dashboard={
+                "template_id": template["id"],
+                "signals": visible_signals,
+            },
+            agent_claims=list(self._agent_claims),
+            trust_scores={idx: 0.5 for idx in range(1, 8)},
+            coalition_status={"votes_for": [], "votes_against": []},
+            step_number=self._state.step_count,
+            slo_status={"breached": self._state.step_count >= self._max_steps},
+            your_role="immune",
+            available_evidence=available_evidence,
+            visibility_level="full",
+            whisper_inbox=[],
+            whisper_log=[],
+            incident_severity=severity,
+            red_herring_signals=[],
+            reputation_history={idx: 0.5 for idx in range(1, 8)},
+            active_incidents=[
+                {
+                    "incident_id": template["id"],
+                    "status": active_status,
+                }
+            ],
+            seat_agent_id=0,
+            action_error=action_error,
+        )
+
 ```
 
 ## siege_env/trust/__init__.py (last modified: 2026-04-24T15:24:19+00:00)
@@ -604,7 +822,7 @@ if str(ROOT) not in sys.path:
 
 ```
 
-## tests/master_suite.py (last modified: 2026-04-24T17:22:23+00:00)
+## tests/master_suite.py (last modified: 2026-04-24T17:51:39+00:00)
 ```python
 """Master test suite entrypoint aggregating the project test surface."""
 
@@ -612,6 +830,7 @@ from tests.step_tests.step_00_bootstrap_test import *  # noqa: F401,F403
 from tests.step_tests.step_01_scaffold_test import *  # noqa: F401,F403
 from tests.step_tests.step_02_models_test import *  # noqa: F401,F403
 from tests.step_tests.step_03_incidents_test import *  # noqa: F401,F403
+from tests.step_tests.step_04_minimal_env_test import *  # noqa: F401,F403
 
 ```
 
@@ -1061,5 +1280,97 @@ def test_variant_generator_produces_valid_variant() -> None:
     assert variant["root_cause"] == template["root_cause"]
     assert variant["source_url"] == template["source_url"]
     assert len(variant["observable_signals"]) == len(template["observable_signals"])
+
+```
+
+## tests/step_tests/step_04_minimal_env_test.py (last modified: 2026-04-24T17:51:36+00:00)
+```python
+from __future__ import annotations
+
+from siege_env.models import SIEGEAction, SIEGEObservation, SIEGEState
+from siege_env.server.siege_environment import SIEGEEnvironment
+
+
+def _valid_diagnose_action(root_cause: str) -> dict[str, object]:
+    return {
+        "tool_name": "diagnose",
+        "arguments": {
+            "root_cause": root_cause,
+            "confidence": 0.81,
+            "evidence": ["latency_p99_spike"],
+            "alternative_hypotheses": [],
+        },
+    }
+
+
+def test_reset_returns_valid_observation() -> None:
+    env = SIEGEEnvironment(seed=7)
+    obs = env.reset()
+    assert isinstance(obs, SIEGEObservation)
+    assert obs.step_number == 0
+    assert obs.action_error is None
+
+
+def test_step_accepts_valid_action() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    action = SIEGEAction.model_validate(_valid_diagnose_action(env.state().ground_truth_root_cause))
+    obs, reward, done, info = env.step(action)
+    assert isinstance(obs, SIEGEObservation)
+    assert isinstance(reward, float)
+    assert isinstance(done, bool)
+    assert isinstance(info, dict)
+
+
+def test_done_is_reachable() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    _, _, done, _ = env.step(_valid_diagnose_action(env.state().ground_truth_root_cause))
+    assert done is True
+
+
+def test_reward_is_clamped_between_zero_and_one() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    _, reward, _, _ = env.step(_valid_diagnose_action("wrong_cause"))
+    assert 0.0 <= reward <= 1.0
+
+
+def test_state_serializes_round_trip() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    state = env.state()
+    restored = SIEGEState.from_json(state.to_json())
+    assert restored == state
+
+
+def test_invalid_action_is_handled_gracefully() -> None:
+    env = SIEGEEnvironment(seed=7)
+    env.reset()
+    obs, reward, done, info = env.step({"tool_name": "diagnose", "arguments": {"bad": "payload"}})
+    assert reward == -0.05
+    assert done is False
+    assert obs.action_error is not None
+    assert info["invalid_action"] is True
+
+
+def test_multi_step_episode_works() -> None:
+    env = SIEGEEnvironment(seed=7, max_steps=3)
+    env.reset()
+    _, _, done_1, _ = env.step(_valid_diagnose_action("wrong_cause"))
+    _, _, done_2, _ = env.step(
+        {
+            "tool_name": "escalate",
+            "arguments": {
+                "concern": "potential blast radius increase",
+                "blast_radius_estimate": ["api-gateway"],
+            },
+        }
+    )
+    _, reward_3, done_3, _ = env.step(_valid_diagnose_action(env.state().ground_truth_root_cause))
+    assert done_1 is False
+    assert done_2 is False
+    assert done_3 is True
+    assert reward_3 == 1.0
 
 ```
