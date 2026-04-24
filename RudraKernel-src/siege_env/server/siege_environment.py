@@ -399,3 +399,33 @@ def _step_with_postmortem_synced_observation(self: SIEGEEnvironment, action_payl
 
 
 SIEGEEnvironment.step = _step_with_postmortem_synced_observation
+
+# Step 20 append-only integration: frozen opponent league roster at reset
+from siege_env.league.opponent_pool import FrozenOpponentPool
+
+_ORIG_RESET_STEP20 = SIEGEEnvironment.reset
+_ORIG_BUILD_OBS_STEP20 = SIEGEEnvironment._build_observation
+
+
+def _reset_with_league(self: SIEGEEnvironment):
+    obs = _ORIG_RESET_STEP20(self)
+    if not hasattr(self, "_opponent_pool"):
+        self._opponent_pool = FrozenOpponentPool(seed=getattr(self, "_seed", 0))
+    roster = self._opponent_pool.sample(k=3)
+    self._league_roster = [
+        {"opponent_id": r.opponent_id, "policy_tag": r.policy_tag, "tier": r.tier}
+        for r in roster
+    ]
+    obs.incident_dashboard["league_roster"] = list(self._league_roster)
+    return obs
+
+
+def _build_observation_with_league(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP20(self, template=template, action_error=action_error)
+    if hasattr(self, "_league_roster"):
+        obs.incident_dashboard["league_roster"] = list(self._league_roster)
+    return obs
+
+
+SIEGEEnvironment.reset = _reset_with_league
+SIEGEEnvironment._build_observation = _build_observation_with_league

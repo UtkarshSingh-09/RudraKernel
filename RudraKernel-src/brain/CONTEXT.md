@@ -48,3 +48,9 @@
 - Gate test: PASS (5/5)
 - Master suite: PASS (133 passed, 2 skipped)
 - Status: Postmortem reward and dashboard capture now active.
+
+## Step 20 Update (2026-04-24T19:42:10Z)
+- Latest step touched: 20 - Frozen Opponent League
+- Gate test: PASS (4/4)
+- Master suite: PASS (137 passed, 2 skipped)
+- Status: Reset now binds deterministic frozen-opponent roster for league evaluation.
