@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.DS_Store
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Keep videos out of the repo as required by the submission plan
+*.mp4
+*.mov
+*.webm

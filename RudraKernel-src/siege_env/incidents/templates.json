@@ -1,0 +1,102 @@
+[
+  {
+    "id": "gitlab_2017_01_db_recovery",
+    "source_url": "https://about.gitlab.com/blog/2017/02/01/gitlab-dot-com-database-incident/",
+    "root_cause": "accidental_production_database_deletion",
+    "observable_signals": [
+      "database_service_unavailable",
+      "elevated_500_error_rate",
+      "read_write_failures",
+      "restoration_progress_logs"
+    ],
+    "flaw_types": [
+      "type3_tunnel_vision",
+      "type5_premature_closure"
+    ],
+    "blast_radius": [
+      "git_operations",
+      "web_ui",
+      "api_requests"
+    ]
+  },
+  {
+    "id": "cloudflare_2019_07_regex_waf",
+    "source_url": "https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/",
+    "root_cause": "catastrophic_regex_backtracking_in_waf_rule",
+    "observable_signals": [
+      "global_cpu_saturation",
+      "elevated_http_5xx",
+      "latency_spike_across_regions",
+      "waf_rule_deployment_event"
+    ],
+    "flaw_types": [
+      "type1_false_correlation",
+      "type4_blame_shifting"
+    ],
+    "blast_radius": [
+      "edge_proxy_requests",
+      "waf_pipeline",
+      "customer_web_traffic"
+    ]
+  },
+  {
+    "id": "aws_s3_2017_02_us_east_1",
+    "source_url": "https://aws.amazon.com/message/41926/",
+    "root_cause": "incorrect_s3_subsystem_debug_command_execution",
+    "observable_signals": [
+      "s3_api_elevated_error_rate",
+      "s3_console_unreachable",
+      "dependent_service_degradation",
+      "region_specific_alarm_flood"
+    ],
+    "flaw_types": [
+      "type2_scope_inflation",
+      "type3_tunnel_vision"
+    ],
+    "blast_radius": [
+      "s3_get_put_requests",
+      "cloudwatch_metrics_ingest",
+      "downstream_web_apps"
+    ]
+  },
+  {
+    "id": "github_2018_10_network_partition",
+    "source_url": "https://github.blog/news-insights/october-21-incident-report/",
+    "root_cause": "network_partition_between_primary_and_replica_datacenters",
+    "observable_signals": [
+      "replication_lag_growth",
+      "write_operations_degraded",
+      "background_jobs_backlogged",
+      "database_failover_activity"
+    ],
+    "flaw_types": [
+      "type1_false_correlation",
+      "type5_premature_closure"
+    ],
+    "blast_radius": [
+      "repository_writes",
+      "issue_commenting",
+      "pull_request_updates"
+    ]
+  },
+  {
+    "id": "google_sre_shakespeare_case",
+    "source_url": "https://sre.google/sre-book/addressing-cascading-failures/",
+    "root_cause": "overload_and_cascading_failure_from_traffic_and_resource_contention",
+    "observable_signals": [
+      "queue_depth_increase",
+      "request_timeouts",
+      "retry_storm_pattern",
+      "backend_saturation"
+    ],
+    "flaw_types": [
+      "type2_scope_inflation",
+      "type4_blame_shifting"
+    ],
+    "blast_radius": [
+      "frontend_request_path",
+      "backend_dependencies",
+      "user_facing_latency_slo"
+    ]
+  }
+]
