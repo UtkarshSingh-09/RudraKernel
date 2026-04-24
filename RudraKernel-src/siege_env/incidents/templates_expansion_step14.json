@@ -1,0 +1,122 @@
+[
+  {
+    "id": "slack_2021_01_dns_dependency",
+    "source_url": "https://slack.engineering/slacks-outage-on-january-4th-2021/",
+    "root_cause": "dns_resolution_dependency_failure",
+    "observable_signals": ["api_timeouts", "workspace_disconnects", "retry_storm", "edge_dns_errors"],
+    "flaw_types": ["type1_false_correlation", "type3_tunnel_vision"],
+    "blast_radius": ["workspace_messaging", "notifications", "realtime_gateway"]
+  },
+  {
+    "id": "meta_2021_10_bgp_withdrawal",
+    "source_url": "https://engineering.fb.com/2021/10/05/networking-traffic/outage-details/",
+    "root_cause": "backbone_bgp_route_withdrawal",
+    "observable_signals": ["global_unreachability", "dns_failures", "service_heartbeat_loss", "backbone_control_plane_alarm"],
+    "flaw_types": ["type2_scope_inflation", "type4_blame_shifting"],
+    "blast_radius": ["social_apps", "internal_tooling", "inter_dc_connectivity"]
+  },
+  {
+    "id": "fastly_2021_06_edge_config_bug",
+    "source_url": "https://www.fastly.com/blog/summary-of-june-8-outage",
+    "root_cause": "latent_software_bug_triggered_by_valid_config",
+    "observable_signals": ["global_edge_503", "cache_node_restarts", "config_deploy_event", "customer_origin_fallback"],
+    "flaw_types": ["type5_premature_closure", "type1_false_correlation"],
+    "blast_radius": ["cdn_delivery", "api_consumers", "media_sites"]
+  },
+  {
+    "id": "gcp_2020_11_auth_quota_exhaustion",
+    "source_url": "https://status.cloud.google.com/incidents/6PM5mNd43NbMqjCZ5REh",
+    "root_cause": "global_auth_quota_exhaustion",
+    "observable_signals": ["token_issuance_errors", "inter_service_auth_failures", "control_plane_delays", "error_budget_burn"],
+    "flaw_types": ["type2_scope_inflation", "type3_tunnel_vision"],
+    "blast_radius": ["gcp_control_plane", "managed_services", "customer_api_calls"]
+  },
+  {
+    "id": "azure_2023_01_wan_issue",
+    "source_url": "https://azure.status.microsoft/en-us/status/history/",
+    "root_cause": "wide_area_network_connectivity_issue",
+    "observable_signals": ["regional_packet_loss", "cross_region_latency_spike", "service_health_alerts", "control_plane_retries"],
+    "flaw_types": ["type1_false_correlation", "type4_blame_shifting"],
+    "blast_radius": ["compute_networking", "managed_databases", "external_ingress"]
+  },
+  {
+    "id": "dropbox_2014_01_auth_bug",
+    "source_url": "https://blogs.dropbox.com/tech/2014/01/recent-authentication-issues/",
+    "root_cause": "authentication_service_bug_after_deploy",
+    "observable_signals": ["login_failures", "session_validation_errors", "support_ticket_spike", "rollback_event"],
+    "flaw_types": ["type5_premature_closure", "type3_tunnel_vision"],
+    "blast_radius": ["user_auth", "sync_clients", "api_tokens"]
+  },
+  {
+    "id": "stripe_2019_07_db_failover",
+    "source_url": "https://stripe.com/blog/july-2019-incident",
+    "root_cause": "database_failover_coordination_failure",
+    "observable_signals": ["payment_api_errors", "replication_lag", "queue_backpressure", "write_timeouts"],
+    "flaw_types": ["type2_scope_inflation", "type5_premature_closure"],
+    "blast_radius": ["payment_processing", "dashboard_api", "webhooks"]
+  },
+  {
+    "id": "twilio_2023_08_kv_dependency",
+    "source_url": "https://status.twilio.com/",
+    "root_cause": "regional_kv_dependency_degradation",
+    "observable_signals": ["sms_send_latency", "retry_queue_growth", "status_callback_delays", "region_alarm_spike"],
+    "flaw_types": ["type3_tunnel_vision", "type4_blame_shifting"],
+    "blast_radius": ["messaging_api", "verification_flows", "notify_services"]
+  },
+  {
+    "id": "atlassian_2022_04_script_failure",
+    "source_url": "https://www.atlassian.com/engineering/april-2022-outage-post-incident-review",
+    "root_cause": "maintenance_script_accidental_data_deletion",
+    "observable_signals": ["tenant_unavailability", "restore_job_queue", "support_backlog", "service_restart_cycles"],
+    "flaw_types": ["type4_blame_shifting", "type5_premature_closure"],
+    "blast_radius": ["jira_confluence_tenants", "admin_portal", "api_integrations"]
+  },
+  {
+    "id": "datadog_2021_11_message_bus",
+    "source_url": "https://www.datadoghq.com/blog/engineering/",
+    "root_cause": "message_bus_backpressure_and_partitioning",
+    "observable_signals": ["metric_ingest_delay", "eventual_consistency_lag", "consumer_rebalance_spike", "pipeline_timeouts"],
+    "flaw_types": ["type2_scope_inflation", "type1_false_correlation"],
+    "blast_radius": ["observability_ingest", "alerts_pipeline", "dashboard_freshness"]
+  },
+  {
+    "id": "zoom_2020_08_dns_registrar",
+    "source_url": "https://blog.zoom.us/",
+    "root_cause": "dns_registrar_communication_failure",
+    "observable_signals": ["join_meeting_failures", "domain_resolution_errors", "mobile_client_retries", "status_page_alert"],
+    "flaw_types": ["type1_false_correlation", "type3_tunnel_vision"],
+    "blast_radius": ["meeting_join_flow", "web_client", "api_entrypoints"]
+  },
+  {
+    "id": "shopify_2020_09_kubernetes",
+    "source_url": "https://shopify.engineering/",
+    "root_cause": "kubernetes_control_plane_instability",
+    "observable_signals": ["pod_restart_storm", "api_throttling", "checkout_latency_spike", "cluster_event_flood"],
+    "flaw_types": ["type2_scope_inflation", "type5_premature_closure"],
+    "blast_radius": ["checkout_flow", "admin_panel", "storefront_api"]
+  },
+  {
+    "id": "netflix_2012_12_aws_outage",
+    "source_url": "https://netflixtechblog.com/",
+    "root_cause": "dependency_failure_in_cloud_region",
+    "observable_signals": ["service_fallback_activation", "playback_errors", "regional_unhealthy_markers", "traffic_shift_events"],
+    "flaw_types": ["type4_blame_shifting", "type1_false_correlation"],
+    "blast_radius": ["streaming_playback", "recommendations", "catalog_services"]
+  },
+  {
+    "id": "pagerduty_2023_01_db_migration",
+    "source_url": "https://www.pagerduty.com/blog/",
+    "root_cause": "database_migration_lock_contention",
+    "observable_signals": ["incident_create_latency", "notification_backlog", "api_error_spike", "worker_queue_growth"],
+    "flaw_types": ["type3_tunnel_vision", "type5_premature_closure"],
+    "blast_radius": ["incident_management", "notifications", "event_ingestion"]
+  },
+  {
+    "id": "openai_2023_11_capacity_event",
+    "source_url": "https://status.openai.com/incidents",
+    "root_cause": "capacity_management_and_dependency_saturation",
+    "observable_signals": ["request_queue_growth", "response_latency_spike", "partial_feature_degradation", "autoscaler_limits_hit"],
+    "flaw_types": ["type2_scope_inflation", "type1_false_correlation"],
+    "blast_radius": ["inference_api", "web_chat", "tooling_integrations"]
+  }
+]

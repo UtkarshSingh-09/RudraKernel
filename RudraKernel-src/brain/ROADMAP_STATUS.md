@@ -14,3 +14,4 @@
 | 11 | Temporal Evidence Dynamics + R6 | Utkarsh | ✅ | PASS | 2026-04-24 |
 | 12 | Confidence Calibration + R5 | Utkarsh | ✅ | PASS | 2026-04-24 |
 | 13 | Epistemic Cascade Failures | Ankit | ✅ | PASS | 2026-04-24 |
+| 14 | Expand to 20 Incident Templates | Ankit | ✅ | PASS | 2026-04-24 |

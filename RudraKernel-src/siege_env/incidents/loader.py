@@ -58,3 +58,34 @@ def load_templates(path: Path | None = None) -> list[dict[str, Any]]:
         raise ValueError("Incident templates payload must be a list.")
 
     return [_validate_template(item, idx) for idx, item in enumerate(raw_payload)]
+
+# Step 14 append-only extension: expanded template loading (5 seed + 15 additional)
+EXPANSION_TEMPLATES_PATH = Path(__file__).with_name("templates_expansion_step14.json")
+_ORIGINAL_LOAD_TEMPLATES_STEP14 = load_templates
+
+
+def load_templates(
+    path: Path | None = None,
+    *,
+    include_step14_expansion: bool = False,
+) -> list[dict[str, Any]]:
+    seed_templates = _ORIGINAL_LOAD_TEMPLATES_STEP14(path)
+    if not include_step14_expansion:
+        return seed_templates
+
+    raw_expansion = json.loads(EXPANSION_TEMPLATES_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw_expansion, list):
+        raise ValueError("Step 14 expansion payload must be a list.")
+
+    validated_expansion = [
+        _validate_template(item, idx)
+        for idx, item in enumerate(raw_expansion)
+    ]
+
+    merged = seed_templates + validated_expansion
+    seen: set[str] = set()
+    for template in merged:
+        if template["id"] in seen:
+            raise ValueError(f"Duplicate template id detected: {template['id']}")
+        seen.add(template["id"])
+    return merged

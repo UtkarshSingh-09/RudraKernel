@@ -12,3 +12,9 @@
 - Gate test: PASS (4/4)
 - Master suite: PASS (89 passed, 2 skipped)
 - Status: Cascade metadata integrated into environment info/observation flow.
+
+## Step 14 Update (2026-04-24T19:31:40Z)
+- Latest step touched: 14 - Expand to 20 Incident Templates
+- Gate test: PASS (21/21)
+- Master suite: PASS (110 passed, 2 skipped)
+- Status: Expanded loader path supports full 20-template corpus.
