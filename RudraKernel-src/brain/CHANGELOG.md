@@ -167,3 +167,10 @@
 **Master suite:** PASS (140 passed, 2 skipped)
 **Coverage:** 0.0%
 **Brain snapshot:** brain/snapshots/step_21_2026-04-24T19-44-30Z.json
+
+## 2026-04-24T19:46:10Z - Step 22: Held-Out Eval + Ablation Harness
+**Owner:** Ankit | **Reviewer:** Utkarsh
+**Gate test:** PASS (3/3)
+**Master suite:** PASS (143 passed, 2 skipped)
+**Coverage:** 0.0%
+**Brain snapshot:** brain/snapshots/step_22_2026-04-24T19-46-10Z.json

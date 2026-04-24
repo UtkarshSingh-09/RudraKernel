@@ -60,3 +60,9 @@
 - Gate test: PASS (3/3)
 - Master suite: PASS (140 passed, 2 skipped)
 - Status: Step trajectories now logged to replay JSONL with reader/CLI support.
+
+## Step 22 Update (2026-04-24T19:46:10Z)
+- Latest step touched: 22 - Held-Out Eval + Ablation Harness
+- Gate test: PASS (3/3)
+- Master suite: PASS (143 passed, 2 skipped)
+- Status: Deterministic held-out split and ablation plan generation are active.

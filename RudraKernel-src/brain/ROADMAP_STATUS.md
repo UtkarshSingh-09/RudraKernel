@@ -22,3 +22,4 @@
 | 19 | Post-Mortem Generation + R7 | Ankit | ✅ | PASS | 2026-04-24 |
 | 20 | Frozen Opponent League | Ankit | ✅ | PASS | 2026-04-24 |
 | 21 | Determinism + Replay System | Ankit | ✅ | PASS | 2026-04-24 |
+| 22 | Held-Out Eval + Ablation Harness | Ankit | ✅ | PASS | 2026-04-24 |

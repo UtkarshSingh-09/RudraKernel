@@ -1,0 +1,5 @@
+name: base
+env: siege
+seed: 42
+episodes: 500
+heldout_fraction: 0.2
