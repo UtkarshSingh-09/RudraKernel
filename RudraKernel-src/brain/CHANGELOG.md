@@ -125,3 +125,10 @@
 **Master suite:** PASS (114 passed, 2 skipped)
 **Coverage:** 0.0%
 **Brain snapshot:** brain/snapshots/step_15_2026-04-24T19-36-20Z.json
+
+## 2026-04-24T19:37:10Z - Step 16: Whisper / Private Channels
+**Owner:** Ankit | **Reviewer:** Utkarsh
+**Gate test:** PASS (4/4)
+**Master suite:** PASS (118 passed, 2 skipped)
+**Coverage:** 0.0%
+**Brain snapshot:** brain/snapshots/step_16_2026-04-24T19-37-10Z.json

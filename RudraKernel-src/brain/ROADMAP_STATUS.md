@@ -16,3 +16,4 @@
 | 13 | Epistemic Cascade Failures | Ankit | ✅ | PASS | 2026-04-24 |
 | 14 | Expand to 20 Incident Templates | Ankit | ✅ | PASS | 2026-04-24 |
 | 15 | Information Asymmetry | Ankit | ✅ | PASS | 2026-04-24 |
+| 16 | Whisper / Private Channels | Ankit | ✅ | PASS | 2026-04-24 |

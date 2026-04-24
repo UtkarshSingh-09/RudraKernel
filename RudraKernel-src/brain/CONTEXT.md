@@ -24,3 +24,9 @@
 - Gate test: PASS (4/4)
 - Master suite: PASS (114 passed, 2 skipped)
 - Status: Observation evidence filtering now visibility-tiered by role/step.
+
+## Step 16 Update (2026-04-24T19:37:10Z)
+- Latest step touched: 16 - Whisper / Private Channels
+- Gate test: PASS (4/4)
+- Master suite: PASS (118 passed, 2 skipped)
+- Status: Private channel actions now logged and surfaced in observations.

@@ -237,3 +237,65 @@ def _build_observation_with_asymmetry(self: SIEGEEnvironment, *, template, actio
 
 
 SIEGEEnvironment._build_observation = _build_observation_with_asymmetry
+
+# Step 16 append-only integration: whisper/private channels
+from siege_env.mechanics.whisper import build_whisper_event
+
+_ORIG_STEP_STEP16 = SIEGEEnvironment.step
+_ORIG_BUILD_OBS_STEP16 = SIEGEEnvironment._build_observation
+
+
+def _step_with_whispers(self: SIEGEEnvironment, action_payload):
+    if not hasattr(self, "_whisper_log_internal"):
+        self._whisper_log_internal = []
+        self._whisper_inbox_internal = []
+
+    obs, reward, done, info = _ORIG_STEP_STEP16(self, action_payload)
+
+    try:
+        action = SIEGEAction.model_validate(action_payload)
+    except Exception:  # pragma: no cover - invalid payload path already handled upstream
+        action = None
+
+    if action is not None and action.tool_name == "whisper":
+        event = build_whisper_event(
+            sender_agent_id=0,
+            target_agent_id=action.arguments.target_agent_id,
+            message=action.arguments.message,
+            step_number=obs.step_number,
+        ).to_dict()
+        self._whisper_log_internal.append(event)
+        if action.arguments.target_agent_id == 0:
+            self._whisper_inbox_internal.append(event)
+
+    info = dict(info)
+    info["whispers_logged"] = len(self._whisper_log_internal)
+    return obs, reward, done, info
+
+
+def _build_observation_with_whispers(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP16(self, template=template, action_error=action_error)
+    if not hasattr(self, "_whisper_log_internal"):
+        self._whisper_log_internal = []
+        self._whisper_inbox_internal = []
+    obs.whisper_log = list(self._whisper_log_internal)
+    obs.whisper_inbox = list(self._whisper_inbox_internal)
+    return obs
+
+
+SIEGEEnvironment.step = _step_with_whispers
+SIEGEEnvironment._build_observation = _build_observation_with_whispers
+
+# Step 16 append-only fix: ensure returned step observation includes latest whispers
+_ORIG_STEP_STEP16_SYNC = SIEGEEnvironment.step
+
+
+def _step_with_whispers_synced_observation(self: SIEGEEnvironment, action_payload):
+    obs, reward, done, info = _ORIG_STEP_STEP16_SYNC(self, action_payload)
+    if hasattr(self, "_whisper_log_internal"):
+        obs.whisper_log = list(self._whisper_log_internal)
+        obs.whisper_inbox = list(getattr(self, "_whisper_inbox_internal", []))
+    return obs, reward, done, info
+
+
+SIEGEEnvironment.step = _step_with_whispers_synced_observation
