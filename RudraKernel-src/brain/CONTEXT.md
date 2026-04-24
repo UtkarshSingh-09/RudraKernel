@@ -54,3 +54,9 @@
 - Gate test: PASS (4/4)
 - Master suite: PASS (137 passed, 2 skipped)
 - Status: Reset now binds deterministic frozen-opponent roster for league evaluation.
+
+## Step 21 Update (2026-04-24T19:44:30Z)
+- Latest step touched: 21 - Determinism + Replay System
+- Gate test: PASS (3/3)
+- Master suite: PASS (140 passed, 2 skipped)
+- Status: Step trajectories now logged to replay JSONL with reader/CLI support.

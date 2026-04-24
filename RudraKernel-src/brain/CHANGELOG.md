@@ -160,3 +160,10 @@
 **Master suite:** PASS (137 passed, 2 skipped)
 **Coverage:** 0.0%
 **Brain snapshot:** brain/snapshots/step_20_2026-04-24T19-42-10Z.json
+
+## 2026-04-24T19:44:30Z - Step 21: Determinism + Replay System
+**Owner:** Ankit | **Reviewer:** Utkarsh
+**Gate test:** PASS (3/3)
+**Master suite:** PASS (140 passed, 2 skipped)
+**Coverage:** 0.0%
+**Brain snapshot:** brain/snapshots/step_21_2026-04-24T19-44-30Z.json

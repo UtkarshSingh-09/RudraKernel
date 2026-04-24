@@ -429,3 +429,31 @@ def _build_observation_with_league(self: SIEGEEnvironment, *, template, action_e
 
 SIEGEEnvironment.reset = _reset_with_league
 SIEGEEnvironment._build_observation = _build_observation_with_league
+
+# Step 21 append-only integration: deterministic replay event logging
+from pathlib import Path
+from siege_env.replay.logger import ReplayLogger
+
+_ORIG_STEP_STEP21 = SIEGEEnvironment.step
+
+
+def _step_with_replay_logging(self: SIEGEEnvironment, action_payload):
+    if not hasattr(self, "_replay_logger"):
+        replay_path = Path("/tmp") / f"siege_replay_{getattr(self, '_seed', 0)}.jsonl"
+        self._replay_logger = ReplayLogger(replay_path)
+
+    obs, reward, done, info = _ORIG_STEP_STEP21(self, action_payload)
+    self._replay_logger.append(
+        {
+            "step": obs.step_number,
+            "tool": action_payload.get("tool_name") if isinstance(action_payload, dict) else getattr(action_payload, "tool_name", "unknown"),
+            "reward": reward,
+            "done": done,
+        }
+    )
+    info = dict(info)
+    info["replay_log_path"] = str(self._replay_logger._path)
+    return obs, reward, done, info
+
+
+SIEGEEnvironment.step = _step_with_replay_logging

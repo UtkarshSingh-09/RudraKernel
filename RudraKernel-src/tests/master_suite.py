@@ -21,3 +21,4 @@ from tests.step_tests.step_17_red_herrings_r9_test import *  # noqa: F401,F403
 from tests.step_tests.step_18_severity_r8_test import *  # noqa: F401,F403
 from tests.step_tests.step_19_postmortem_r7_test import *  # noqa: F401,F403
 from tests.step_tests.step_20_league_test import *  # noqa: F401,F403
+from tests.step_tests.step_21_replay_determinism_test import *  # noqa: F401,F403
