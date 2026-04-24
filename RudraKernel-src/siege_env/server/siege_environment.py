@@ -213,3 +213,27 @@ def _build_observation_with_cascade(self: SIEGEEnvironment, *, template, action_
 
 SIEGEEnvironment.step = _step_with_cascade
 SIEGEEnvironment._build_observation = _build_observation_with_cascade
+
+# Step 15 append-only integration: information asymmetry visibility filtering
+from siege_env.mechanics.info_asymmetry import (
+    filter_evidence_for_visibility,
+    visibility_for_step,
+)
+
+_ORIG_BUILD_OBS_STEP15 = SIEGEEnvironment._build_observation
+
+
+def _build_observation_with_asymmetry(self: SIEGEEnvironment, *, template, action_error):
+    obs = _ORIG_BUILD_OBS_STEP15(self, template=template, action_error=action_error)
+    role = getattr(self, "_seat_role", "immune")
+    visibility = visibility_for_step(obs.step_number, role)
+    obs.visibility_level = visibility
+    obs.available_evidence = filter_evidence_for_visibility(
+        obs.available_evidence,
+        visibility_level=visibility,
+    )
+    obs.incident_dashboard["visibility"] = visibility
+    return obs
+
+
+SIEGEEnvironment._build_observation = _build_observation_with_asymmetry

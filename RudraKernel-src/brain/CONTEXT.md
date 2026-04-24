@@ -18,3 +18,9 @@
 - Gate test: PASS (21/21)
 - Master suite: PASS (110 passed, 2 skipped)
 - Status: Expanded loader path supports full 20-template corpus.
+
+## Step 15 Update (2026-04-24T19:36:20Z)
+- Latest step touched: 15 - Information Asymmetry
+- Gate test: PASS (4/4)
+- Master suite: PASS (114 passed, 2 skipped)
+- Status: Observation evidence filtering now visibility-tiered by role/step.

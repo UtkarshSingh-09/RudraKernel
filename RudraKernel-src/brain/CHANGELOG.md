@@ -118,3 +118,10 @@
 **Master suite:** PASS (110 passed, 2 skipped)
 **Coverage:** 0.0%
 **Brain snapshot:** brain/snapshots/step_14_2026-04-24T19-31-40Z.json
+
+## 2026-04-24T19:36:20Z - Step 15: Information Asymmetry
+**Owner:** Ankit | **Reviewer:** Utkarsh
+**Gate test:** PASS (4/4)
+**Master suite:** PASS (114 passed, 2 skipped)
+**Coverage:** 0.0%
+**Brain snapshot:** brain/snapshots/step_15_2026-04-24T19-36-20Z.json
