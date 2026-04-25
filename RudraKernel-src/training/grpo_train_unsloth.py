@@ -247,6 +247,19 @@ def setup_unsloth_model(config: GRPOTrainingConfig) -> tuple[Any, Any]:
         load_in_4bit=config.load_in_4bit,
     )
     
+    # Attach LoRA adapters (required for training quantized models)
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r=16,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                        "gate_proj", "up_proj", "down_proj"],
+        lora_alpha=16,
+        lora_dropout=0,
+        bias="none",
+        use_gradient_checkpointing="unsloth",
+        random_state=42,
+    )
+    
     # Prepare for training
     model = FastLanguageModel.for_training(model)
     
