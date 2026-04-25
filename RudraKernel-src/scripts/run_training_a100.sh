@@ -26,7 +26,7 @@ if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'CUDA av
   exit 1
 fi
 
-echo "=== Step 3: Clone and install project ==="
+echo "=== Step 3: Locate project root ==="
 if [ -f "pyproject.toml" ] && [ -d "training" ]; then
   # Running from repository root already (HF Docker /app layout)
   :
@@ -41,7 +41,9 @@ else
   exit 1
 fi
 
-pip install -q -e . --no-deps
+# Avoid editable install in Space runtime because /app can be read-only.
+# Running from repo root makes local packages importable via current working directory.
+export PYTHONPATH="$(pwd):${PYTHONPATH}"
 
 echo "=== Step 4: Run training ==="
 python -m training.grpo_train_unsloth \
