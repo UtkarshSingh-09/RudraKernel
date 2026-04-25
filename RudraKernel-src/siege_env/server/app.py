@@ -104,34 +104,38 @@ def state() -> dict[str, object]:
 def train_start(x_train_key: str | None = Header(default=None)) -> dict[str, object]:
     """Start A100 training in the background via the training shell script."""
     global training_process, training_started_at, training_last_exit_code
-    _authorize_train(x_train_key)
+    try:
+        _authorize_train(x_train_key)
 
-    with training_lock:
-        if training_process is not None and training_process.poll() is None:
-            return _training_snapshot()
+        with training_lock:
+            if training_process is not None and training_process.poll() is None:
+                return _training_snapshot()
 
-        if not training_script_path.exists():
-            raise HTTPException(
-                status_code=500,
-                detail=f"Training script not found: {training_script_path}",
-            )
+            if not training_script_path.exists():
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Training script not found: {training_script_path}",
+                )
 
-        training_log_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with training_log_path.open("a", encoding="utf-8") as handle:
+            training_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with training_log_path.open("ab") as handle:
                 training_process = subprocess.Popen(
                     ["bash", str(training_script_path)],
                     cwd=str(project_root),
                     stdout=handle,
                     stderr=subprocess.STDOUT,
-                    start_new_session=True,
                 )
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to start training process: {exc}") from exc
 
-        training_started_at = time.time()
-        training_last_exit_code = None
-        return _training_snapshot()
+            training_started_at = time.time()
+            training_last_exit_code = None
+            return _training_snapshot()
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - fallback for container/runtime edge cases
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start training process ({type(exc).__name__}): {exc}",
+        ) from exc
 
 
 @app.get("/train/status")
