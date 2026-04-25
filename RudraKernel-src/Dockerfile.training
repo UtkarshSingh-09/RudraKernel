@@ -28,8 +28,9 @@ RUN pip install --no-cache-dir \
     "huggingface_hub>=0.20.0" \
     "pyyaml>=6.0.0"
 
-# Install Unsloth (after torch to avoid version conflicts)
+# Install Unsloth + unsloth_zoo (after torch to avoid version conflicts)
 RUN pip install --no-cache-dir \
+    "unsloth_zoo" \
     "unsloth @ git+https://github.com/unslothai/unsloth.git"
 
 # Force Python to flush stdout/stderr immediately (critical for HF Spaces logs)
