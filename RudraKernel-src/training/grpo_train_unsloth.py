@@ -22,7 +22,7 @@ import inspect
 import json
 import logging
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from random import Random
 from typing import Any
@@ -49,6 +49,7 @@ from siege_env.server.siege_environment import SIEGEEnvironment
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+UTC = timezone.utc
 
 
 @dataclass(slots=True)
