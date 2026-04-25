@@ -353,6 +353,23 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     for _attr in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
         if not hasattr(trainer, _attr):
             setattr(trainer, _attr, None)
+
+    # Workaround: Unsloth 2026.4.8 compiled cache references
+    # truncate_with_protected_tokens without importing it.
+    # Inject into builtins (fallback scope) + all loaded compiled-cache modules.
+    try:
+        from trl.trainer.grpo_trainer import truncate_with_protected_tokens as _trunc_fn
+    except ImportError:
+        def _trunc_fn(prompt_ids, prompt_mask, max_length=None, protected=None):  # type: ignore[misc]
+            if max_length is not None and prompt_ids.shape[-1] > max_length:
+                prompt_ids = prompt_ids[:, -max_length:]
+                prompt_mask = prompt_mask[:, -max_length:]
+            return prompt_ids, prompt_mask
+    import builtins, sys as _sys  # noqa: E401
+    builtins.truncate_with_protected_tokens = _trunc_fn  # type: ignore[attr-defined]
+    for _mn, _mo in list(_sys.modules.items()):
+        if "unsloth_compiled_cache" in _mn:
+            _mo.__dict__.setdefault("truncate_with_protected_tokens", _trunc_fn)
     
     # 8. Train
     logger.info("Starting GRPO training...")
