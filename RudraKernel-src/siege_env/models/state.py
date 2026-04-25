@@ -18,12 +18,17 @@ class SIEGEState:
     ground_truth_root_cause: str
     current_tier: int
     arms_race_score: float
+    trigger_activated: bool = False
+    cooperative_steps: int = 0
+    trigger_step: int | None = None
 
     def __post_init__(self) -> None:
         if not self.episode_id.strip():
             raise ValueError("episode_id must be a non-empty string.")
         if self.step_count < 0:
             raise ValueError("step_count must be non-negative.")
+        if self.cooperative_steps < 0:
+            raise ValueError("cooperative_steps must be non-negative.")
         if not self.incident_template_id.strip():
             raise ValueError("incident_template_id must be a non-empty string.")
         if not self.ground_truth_root_cause.strip():
@@ -49,6 +54,13 @@ class SIEGEState:
             ground_truth_root_cause=str(payload["ground_truth_root_cause"]),
             current_tier=int(payload["current_tier"]),
             arms_race_score=float(payload["arms_race_score"]),
+            trigger_activated=bool(payload.get("trigger_activated", False)),
+            cooperative_steps=int(payload.get("cooperative_steps", 0)),
+            trigger_step=(
+                int(payload["trigger_step"])
+                if payload.get("trigger_step") is not None
+                else None
+            ),
         )
 
     def to_json(self) -> str:

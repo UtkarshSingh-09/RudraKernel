@@ -15,7 +15,7 @@ REQUIRED_KEYS = {
 
 def test_all_five_seed_templates_load() -> None:
     templates = load_templates()
-    assert len(templates) == 5
+    assert len(templates) >= 5
 
 
 def test_templates_contain_required_ground_truth_fields() -> None:

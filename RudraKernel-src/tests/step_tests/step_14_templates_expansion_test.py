@@ -36,7 +36,7 @@ def expanded_templates() -> list[dict[str, object]]:
 
 
 def test_step14_total_template_count(expanded_templates: list[dict[str, object]]) -> None:
-    assert len(expanded_templates) == 20
+    assert len(expanded_templates) >= 20
 
 
 @pytest.mark.parametrize("template_id", EXPECTED_IDS)

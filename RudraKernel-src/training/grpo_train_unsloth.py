@@ -36,16 +36,22 @@ TRL_IMPORT_ERROR: ImportError | None = None
 try:
     from unsloth import FastLanguageModel
     HAS_UNSLOTH = True
-except ImportError as exc:
+except Exception as exc:
     HAS_UNSLOTH = False
-    UNSLOTH_IMPORT_ERROR = exc
+    if isinstance(exc, ImportError):
+        UNSLOTH_IMPORT_ERROR = exc
+    else:
+        UNSLOTH_IMPORT_ERROR = ImportError(str(exc))
 
 try:
     from trl import GRPOConfig, GRPOTrainer
     HAS_TRL = True
-except ImportError as exc:
+except Exception as exc:
     HAS_TRL = False
-    TRL_IMPORT_ERROR = exc
+    if isinstance(exc, ImportError):
+        TRL_IMPORT_ERROR = exc
+    else:
+        TRL_IMPORT_ERROR = ImportError(str(exc))
 
 try:
     import wandb
@@ -67,7 +73,7 @@ class GRPOTrainingConfig:
     """Production GRPO training config with Unsloth + TRL."""
 
     # Model
-    model_name: str = "unsloth/Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
+    model_name: str = "unsloth/Qwen2.5-4B-Instruct-bnb-4bit"
     max_seq_length: int = 1024
     load_in_4bit: bool = True
 

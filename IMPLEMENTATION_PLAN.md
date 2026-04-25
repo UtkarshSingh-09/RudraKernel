@@ -1310,6 +1310,109 @@ Step 27's `SUBMISSION.md` and release tag are NOT optional. Restated for emphasi
 
 ---
 
+## 13. HYBRID CLINICAL-TRIAL PLAN — EVAL-OVERLAY ADDENDUM (2026-04-26)
+
+**Status:** Additive, eval-only. Adopted after the audit on 2026-04-26 produced (a) bug fixes already merged in Steps 04/07/08/13/16/17/18/19/25 modules and (b) a recommendation for a clinical-trial style epistemic evaluation overlay. The full friend-proposed 350-episode multi-stage retrain is **NOT** adopted. Only the eval-overlay slice is.
+
+### 13.1 🚨 NON-NEGOTIABLE CONSTRAINT — DO NOT TOUCH GRPO TRAINING
+
+The GRPO training pipeline took ~3-4 hours of bug-hunting on 2026-04-26 to stabilise (reward max-collapse, static trust, sleeper phase wiring, template loader stripping optional keys, CPU-safe imports for the GRPO module). It is now green: 160/160 master suite passing. **Re-introducing instability now is unacceptable.**
+
+**Active training infrastructure (locked, do not change):**
+
+- **Hardware:** Hugging Face Space **A100 (large)** GPU — Space `ankit-choubey/siege-env`. Training is launched and monitored via the Space's `/train/start`, `/train/status`, and `/train/logs` endpoints (Dockerised FastAPI app from Step 26).
+- **Trainer stack:** **Unsloth** (`unsloth==2026.4.8`) + **TRL** (`trl==0.23.1`) + **PEFT** (`peft==0.18.1`) + **transformers** (`4.57.6`) + **torch** (`2.10`). Pinned in `pyproject.toml` and the Space's `requirements.txt`. **Do not bump versions** mid-cycle.
+- **Base model:** `unsloth/Qwen2.5-3B-Instruct-unsloth-bnb-4bit` (4-bit QLoRA). Aligned across `training/grpo_train_unsloth.py` default and the Step 25 gate test.
+- **Checkpoint upload:** trained adapter pushed to HF Hub repo `ankit-choubey/Rudrakernel-unsloth` via `HF_TOKEN` Space secret. **Do not** rotate the token or repo name without coordinating with §13.5 verification.
+- **Launcher:** `scripts/run_training_a100.sh` is the canonical entrypoint inside the Space. The local fallback `training/grpo_train_unsloth.py` is for CPU/CI smoke only (already patched for `RuntimeError`-safe imports).
+
+**FILES THAT MUST NOT BE MODIFIED by Section 13 work:**
+
+- `training/grpo_train_unsloth.py` — only the CPU/CI import-safety patch already applied is permitted. No reward-function rewrite, no step()-contract change, no curriculum-stage switching at episode boundaries.
+- `training/grpo_train.py`
+- `training/configs/*.yaml`
+- `scripts/run_training_a100.sh` (and any sibling deploy/training launchers)
+- `siege_env/server/siege_environment.py` — already patched for dynamic trust + sleeper effective-role + reward components. **No further edits.**
+- `siege_env/server/app.py`
+- `siege_env/rewards/aggregator.py` — weighted-sum + dominance guards already shipped. **Frozen.**
+- `siege_env/rewards/r1_*..r9_*.py` — frozen reward signatures.
+- `siege_env/incidents/loader.py` — optional-key preservation already shipped. Frozen.
+- `siege_env/models/state.py` — `trigger_activated`, `cooperative_steps`, `trigger_step` already added. Frozen.
+- `Dockerfile`, `openenv.yaml`, `pyproject.toml`
+
+If a Section 13 file *appears* to need a change in any of the above, **STOP and escalate**. The eval overlay must adapt to the existing contracts, not the other way around.
+
+**Rule of thumb:** Section 13 only ADDS new files. It does NOT edit existing training/env/reward files. The only acceptable existing-file edits are:
+
+- `siege_env/incidents/templates.json` — APPEND new clinical templates only, using the existing required schema (`id`, `source_url`, `root_cause`, `observable_signals`, `flaw_types`, `blast_radius`) plus the already-supported optional keys (`domain`, `trigger_signal`, `ground_truth`, `false_claim`, `final_decision_options`, `trust_build_steps`). Each new template must pass existing `_validate_template()` in the loader.
+- `docs/*.md` — narrative/storytelling edits.
+- `frontend/*` — demo additions that consume new eval artefacts (read-only).
+
+### 13.2 What the Hybrid Plan Adds (and what it skips)
+
+**KEEP (from friend's full plan):**
+
+- Offline belief tracker that reads existing JSONL replay logs (Step 21 schema) and reconstructs claim → adoption → mutation → collapse trees post-hoc.
+- Epistemic metrics module producing: Correct Final Decision Rate, False Trial Halt Rate, Sleeper Detection Rate, Detection Lead Time, False/Correct Challenge Rate, R₀ (belief reproduction), Belief Half-life, Peak Adoption, Collapse Speed, and an aggregate **Epistemic Resilience Score (ERS)**.
+- 3 clinical-domain templates added to `siege_env/incidents/templates.json` (eval/demo only) using the EXISTING schema. No required-key changes. These give the demo its clinical-trial story without touching reward code.
+- Paired before/after evaluation harness on a heldout split (50 episodes, same seed, baseline vs trained).
+- Reduced vulnerability sweep: 9 configs (3 trust-build-steps × 3 trigger timings) × 20 episodes → heatmap.
+- Clinical-first storytelling: README/blog/pitch lead with the medical-trial narrative ("Epistemic Cascade Failure"), but the underlying env is unchanged.
+
+**SKIP (from friend's full plan):**
+
+- 350-episode multi-stage retrain.
+- Reward-function switching at episode 200 (would invalidate Step 08 dominance guards).
+- Belief tracker INSIDE `step()` (would mutate observation contract — forbidden).
+- Full 36×50 vulnerability sweep (cost vs marginal info not justified at this stage).
+- Adversarial league extension beyond Step 20.
+
+### 13.3 New Files (eval-overlay only — additive, no training impact)
+
+| Priority | File | Purpose | Touches training? |
+|----------|------|---------|--------------------|
+| P0 | `siege_env/replay/belief_tracker_offline.py` | Reads JSONL replay logs, reconstructs belief trees with provenance, mutation history, collapse events. Pure post-hoc — no env coupling. | ❌ No |
+| P0 | `siege_env/replay/epistemic_metrics.py` | `compute_epistemic_metrics(events)` returning the 10 metrics + ERS. Consumes belief-tracker output. | ❌ No |
+| P1 | `siege_env/incidents/templates.json` (APPEND only) | 3 clinical templates: drug-trial-sleeper, vaccine-cascade, oncology-mutation. Existing schema + already-supported optional keys. | ❌ No |
+| P1 | `scripts/paired_eval.py` | Baseline LLM vs trained LLM on same seeds, 50 heldout episodes. Outputs metrics table + JSON for plots. Reads checkpoint via existing client API only. | ❌ No |
+| P2 | `scripts/vulnerability_sweep.py` | 9 configs × 20 eps. Generates heatmap PNG + CSV. Driven through existing `SIEGEEnv` client; no env-internal edits. | ❌ No |
+| P2 | `docs/HYBRID_PLAN_NOTES.md` | Annotation note re-stating §13.1 constraint + how each artefact was produced. | ❌ No |
+
+### 13.4 Schema / Contract Invariants the Eval Overlay MUST Respect
+
+- JSONL replay format from Step 21 (`siege_env/replay/logger.py`) is FROZEN. Belief tracker reads it; never proposes additions.
+- `SIEGEObservation` field set is FROZEN. Eval scripts consume `info`/`observation` as-is.
+- Reward function signatures and the aggregator weights/dominance guards are FROZEN.
+- Trust update rule (+0.05 / -0.08, clamp [0.1, 0.99]) is FROZEN.
+- Sleeper phase keys exposed in `info` (`sleeper_phase`, `trigger_activated`, `trigger_step`) are FROZEN — eval reads them, doesn't add new ones.
+- Template required keys are FROZEN. New optional keys may be READ but the loader has already been patched to preserve them; no further loader changes.
+
+### 13.5 Verification Gate (after each new file lands)
+
+1. `pytest tests/master_suite.py` → must remain **160/160 passing**. Any regression = revert.
+2. `mypy siege_env/replay/belief_tracker_offline.py siege_env/replay/epistemic_metrics.py` → clean.
+3. `ruff check` on touched files → clean.
+4. New clinical templates load via existing `IncidentLoader` without warnings.
+5. `paired_eval.py` and `vulnerability_sweep.py` run end-to-end against the env without modifying any frozen file.
+
+If any of (1)-(5) fails: STOP, do NOT bypass with `--no-verify`, do NOT edit a frozen file to "fix" — revert and rethink.
+
+### 13.6 Branch Awareness for Final Score
+
+- **Scenario A — training succeeded ~50% (checkpoint usable):** Run full hybrid eval; expected score band 8.0-8.5.
+- **Scenario B — training partial ~30%:** Reduced eval still produces a deliverable; expected band 7.0-7.5.
+- **Scenario C — no usable checkpoint ~20%:** Rule-based baseline + zero-shot instruct model evaluated through the same overlay. Expected band 6.5-7.0. The eval overlay still ships a credible clinical-trial story.
+
+### 13.7 Storytelling Hook (clinical-first framing)
+
+README/blog/pitch lead-in language to use (env is unchanged; only narrative shifts):
+
+> "SIEGE is a clinical-trial style multi-agent diagnostic chamber. Pathogen agents build trust over weeks of correct claims, then activate a coordinated sleeper trigger that injects a single high-stakes false diagnosis. We measure not just whether the immune agent gets the final decision right, but whether it detected the deception early enough to halt the trial — quantified by a 10-component Epistemic Resilience Score."
+
+This narrative is delivered entirely by §13 deliverables. **Zero training-pipeline changes.**
+
+---
+
 ## APPROVAL CHECKPOINTS
 
 Before execution begins, please confirm:

@@ -160,7 +160,7 @@ def aggregate_rewards(
     urgency_multiplier: float = 1.0,
     incident_severity: str = "warning",
 ) -> tuple[float, dict[str, Any]]:
-    base_total, components = _ORIGINAL_AGGREGATE_REWARDS_STEP19(
+    _base_total, components = _ORIGINAL_AGGREGATE_REWARDS_STEP19(
         action,
         ground_truth_root_cause=ground_truth_root_cause,
         seat_role=seat_role,
@@ -173,5 +173,27 @@ def aggregate_rewards(
     r7 = compute_r7_postmortem(action, ground_truth_root_cause=ground_truth_root_cause)
     components = dict(components)
     components["r7_postmortem"] = r7
-    total = max(0.0, min(1.0, max(base_total, r7)))
+    weights = {
+        "r1_resolution": 0.30,
+        "r2_deception": 0.25,
+        "r3_detection": 0.20,
+        "r4_trust_calibration": 0.10,
+        "r5_confidence": 0.07,
+        "r6_temporal": 0.04,
+        "r7_postmortem": 0.02,
+        "r8_severity_speed": 0.01,
+        "r9_correlation": 0.01,
+    }
+    if float(components.get("r1_resolution", 0.0)) >= 1.0:
+        total = 1.0
+    else:
+        total = max(
+            0.0,
+            min(1.0, sum(weights[key] * float(components.get(key, 0.0)) for key in weights)),
+        )
+        total = max(
+            total,
+            float(components.get("r2_deception", 0.0)),
+            float(components.get("r3_detection", 0.0)),
+        )
     return total, components

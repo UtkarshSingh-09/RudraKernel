@@ -35,11 +35,17 @@ class SIEGEEnvironment(MCPEnvironment):
         self._population: NPCPopulation | None = None
         self._seat_role = "immune"
         self._done = False
+        self._trust_scores: dict[int, float] = {}
         self._last_reward_components: dict[str, Any] = {
             "r1_resolution": 0.0,
             "r2_deception": 0.0,
             "r3_detection": 0.0,
             "r4_trust_calibration": 0.0,
+            "r5_confidence": 0.0,
+            "r6_temporal": 0.0,
+            "r7_postmortem": 0.0,
+            "r8_severity_speed": 0.0,
+            "r9_correlation": 0.0,
         }
 
     def reset(self) -> SIEGEObservation:
@@ -57,12 +63,18 @@ class SIEGEEnvironment(MCPEnvironment):
         population_seed = self._seed + self._rng.randrange(10_000)
         self._population = NPCPopulation(seed=population_seed, seat_agent_id=0)
         self._agent_claims = self._population.generate_claims(template, step_number=0)
+        self._trust_scores = {idx: 0.5 for idx in range(1, 8)}
         self._done = False
         self._last_reward_components = {
             "r1_resolution": 0.0,
             "r2_deception": 0.0,
             "r3_detection": 0.0,
             "r4_trust_calibration": 0.0,
+            "r5_confidence": 0.0,
+            "r6_temporal": 0.0,
+            "r7_postmortem": 0.0,
+            "r8_severity_speed": 0.0,
+            "r9_correlation": 0.0,
         }
         return self._build_observation(template=template, action_error=None)
 
@@ -86,12 +98,39 @@ class SIEGEEnvironment(MCPEnvironment):
             observation = self._build_observation(template=template, action_error=str(exc))
             return observation, -0.05, self._done, {"invalid_action": True}
 
+        trust_build_steps = int(template.get("trust_build_steps", 3))
+        trigger_signal = str(template.get("trigger_signal", "api_key_injected"))
+        if not self._state.trigger_activated:
+            self._state.cooperative_steps += 1
+            if (
+                self._state.cooperative_steps >= trust_build_steps
+                and trigger_signal in template.get("observable_signals", [])
+            ):
+                self._state.trigger_activated = True
+                self._state.trigger_step = self._state.step_count
+
+        effective_role = self._seat_role
+        if self._seat_role == "pathogen" and not self._state.trigger_activated:
+            effective_role = "cooperative_pathogen"
+
+        for claim in self._agent_claims:
+            try:
+                agent_idx = int(claim.get("agent_id", 0))
+            except (TypeError, ValueError):
+                continue
+            if agent_idx <= 0:
+                continue
+            is_correct = claim.get("root_cause") == self._state.ground_truth_root_cause
+            delta = 0.05 if is_correct else -0.08
+            current = self._trust_scores.get(agent_idx, 0.5)
+            self._trust_scores[agent_idx] = max(0.1, min(0.99, current + delta))
+
         reward, components = aggregate_rewards(
             action,
             ground_truth_root_cause=self._state.ground_truth_root_cause,
-            seat_role=self._seat_role,
+            seat_role=effective_role,
             claims_by_id={claim["claim_id"]: claim for claim in self._agent_claims},
-            trust_scores={idx: 0.5 for idx in range(1, 8)},
+            trust_scores=dict(self._trust_scores),
             agent_reliability={
                 int(claim["agent_id"]): (claim["root_cause"] == self._state.ground_truth_root_cause)
                 for claim in self._agent_claims
@@ -113,6 +152,9 @@ class SIEGEEnvironment(MCPEnvironment):
             "invalid_action": False,
             "reward_components": components,
             "seat_role": self._seat_role,
+            "sleeper_phase": effective_role,
+            "trigger_activated": self._state.trigger_activated,
+            "trigger_step": self._state.trigger_step,
         }
         return observation, reward, self._done, info
 
@@ -145,6 +187,7 @@ class SIEGEEnvironment(MCPEnvironment):
         ]
         available_evidence = [{"type": "signal", "value": signal} for signal in visible_signals]
         active_status = "resolved" if self._done else "active"
+        trust_scores = dict(self._trust_scores) if self._trust_scores else {idx: 0.5 for idx in range(1, 8)}
 
         return SIEGEObservation(
             incident_dashboard={
@@ -152,7 +195,7 @@ class SIEGEEnvironment(MCPEnvironment):
                 "signals": visible_signals,
             },
             agent_claims=list(self._agent_claims),
-            trust_scores={idx: 0.5 for idx in range(1, 8)},
+            trust_scores=trust_scores,
             coalition_status={"votes_for": [], "votes_against": []},
             step_number=self._state.step_count,
             slo_status={"breached": self._state.step_count >= self._max_steps},
@@ -163,7 +206,7 @@ class SIEGEEnvironment(MCPEnvironment):
             whisper_log=[],
             incident_severity=severity,
             red_herring_signals=[],
-            reputation_history={idx: 0.5 for idx in range(1, 8)},
+            reputation_history=trust_scores,
             active_incidents=[
                 {
                     "incident_id": template["id"],

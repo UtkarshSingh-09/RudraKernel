@@ -14,6 +14,14 @@ REQUIRED_TEMPLATE_KEYS = (
     "flaw_types",
     "blast_radius",
 )
+OPTIONAL_TEMPLATE_KEYS = (
+    "domain",
+    "trigger_signal",
+    "ground_truth",
+    "false_claim",
+    "final_decision_options",
+    "trust_build_steps",
+)
 TEMPLATES_PATH = Path(__file__).with_name("templates.json")
 
 
@@ -42,7 +50,7 @@ def _validate_template(raw_template: dict[str, Any], index: int) -> dict[str, An
                 f"Template '{template['id']}' contains invalid values in '{list_key}'."
             )
 
-    return {
+    validated = {
         "id": template["id"].strip(),
         "source_url": template["source_url"].strip(),
         "root_cause": template["root_cause"].strip(),
@@ -50,6 +58,12 @@ def _validate_template(raw_template: dict[str, Any], index: int) -> dict[str, An
         "flaw_types": [item.strip() for item in template["flaw_types"]],
         "blast_radius": [item.strip() for item in template["blast_radius"]],
     }
+
+    for key in OPTIONAL_TEMPLATE_KEYS:
+        if key in raw_template:
+            validated[key] = raw_template[key]
+
+    return validated
 
 
 def load_templates(path: Path | None = None) -> list[dict[str, Any]]:

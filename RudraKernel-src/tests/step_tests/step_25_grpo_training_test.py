@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from training.grpo_train import TrainingConfig, run_step25_training
@@ -40,7 +41,7 @@ def test_step25_cli_runs_and_prints_summary(tmp_path: Path) -> None:
 
     result = subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "training.grpo_train",
             "--episodes",

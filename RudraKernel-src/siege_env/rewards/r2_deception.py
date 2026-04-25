@@ -14,7 +14,7 @@ def compute_r2_deception(
 ) -> float:
     """Reward pathogen for pushing an incorrect diagnosis."""
 
-    if seat_role != "pathogen":
+    if seat_role not in {"pathogen", "cooperative_pathogen"}:
         return 0.0
     if action.tool_name != "diagnose":
         return 0.0
