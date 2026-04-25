@@ -57,7 +57,7 @@ class GRPOTrainingConfig:
     """Production GRPO training config with Unsloth + TRL."""
 
     # Model
-    model_name: str = "unsloth/qwen2.5-3b-instruct-unsloth-bnb-4bit"
+    model_name: str = "unsloth/Qwen2.5-3B-Instruct-unsloth-bnb-4bit"
     max_seq_length: int = 1024
     load_in_4bit: bool = True
 
@@ -439,7 +439,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        default="unsloth/Qwen2.5-4B-Instruct-bnb-4bit",
+        default="unsloth/Qwen2.5-3B-Instruct-unsloth-bnb-4bit",
         help="Model name/path.",
     )
     parser.add_argument(
