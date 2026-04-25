@@ -7,6 +7,14 @@ REPO_URL="https://github.com/UtkarshSingh-09/RudraKernel.git"
 REPO_DIR="RudraKernel"
 PROJECT_SUBDIR="RudraKernel-src"
 OUTPUT_DIR="${TRAIN_OUTPUT_DIR:-/tmp/rudra_unsloth}"
+VENV_DIR="${TRAIN_VENV_DIR:-/tmp/rudra_train_venv}"
+export PIP_CACHE_DIR="${PIP_CACHE_DIR:-/tmp/pip-cache}"
+
+echo "=== Step 0: Prepare writable Python env ==="
+python -m venv "$VENV_DIR"
+# shellcheck disable=SC1090
+source "$VENV_DIR/bin/activate"
+python -m pip install -q --upgrade pip
 
 echo "=== Step 1: Install dependencies ==="
 pip install -q --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio
