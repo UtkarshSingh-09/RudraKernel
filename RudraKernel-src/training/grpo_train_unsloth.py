@@ -57,23 +57,23 @@ class GRPOTrainingConfig:
 
     # Model
     model_name: str = "unsloth/qwen2.5-3b-instruct-unsloth-bnb-4bit"
-    max_seq_length: int = 2048
+    max_seq_length: int = 1024
     load_in_4bit: bool = True
 
     # Training
     num_train_epochs: int = 3
-    num_mini_batches: int = 4
+    num_mini_batches: int = 2
     learning_rate: float = 5e-5
     weight_decay: float = 0.01
     warmup_ratio: float = 0.1
     
     # Data
     trajectory_episodes: int = 200  # Real env rollouts
-    max_trajectory_length: int = 512
+    max_trajectory_length: int = 256
     
-    # Colab optimization
-    gradient_accumulation_steps: int = 4
-    per_device_train_batch_size: int = 2  # Colab GPU memory limit
+    # GPU optimization (A10G 24GB)
+    gradient_accumulation_steps: int = 8
+    per_device_train_batch_size: int = 1  # Conserve VRAM for GRPO generation
     
     # Logging
     log_to_wandb: bool = True
