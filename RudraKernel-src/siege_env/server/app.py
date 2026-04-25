@@ -21,8 +21,20 @@ training_process: subprocess.Popen[bytes] | None = None
 training_started_at: float | None = None
 training_last_exit_code: int | None = None
 project_root = Path(__file__).resolve().parents[2]
-training_log_path = project_root / "artifacts/training/unsloth/train.log"
-training_script_path = project_root / "scripts/run_training_a100.sh"
+
+
+def _resolve_workspace_root() -> Path:
+    """Find the directory that contains the training module."""
+    candidates = [project_root, project_root / "RudraKernel-src"]
+    for candidate in candidates:
+        if (candidate / "training/grpo_train_unsloth.py").exists():
+            return candidate
+    return project_root
+
+
+workspace_root = _resolve_workspace_root()
+training_log_path = workspace_root / "artifacts/training/unsloth/train.log"
+training_config_path = workspace_root / "training/configs/a100_grpo.yaml"
 
 
 class StepRequest(BaseModel):
@@ -111,17 +123,25 @@ def train_start(x_train_key: str | None = Header(default=None)) -> dict[str, obj
             if training_process is not None and training_process.poll() is None:
                 return _training_snapshot()
 
-            if not training_script_path.exists():
+            training_module = workspace_root / "training/grpo_train_unsloth.py"
+            if not training_module.exists():
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Training script not found: {training_script_path}",
+                    detail=f"Training module not found: {training_module}",
                 )
 
             training_log_path.parent.mkdir(parents=True, exist_ok=True)
             with training_log_path.open("ab") as handle:
                 training_process = subprocess.Popen(
-                    ["bash", str(training_script_path)],
-                    cwd=str(project_root),
+                    [
+                        "python",
+                        "-m",
+                        "training.grpo_train_unsloth",
+                        "--config",
+                        str(training_config_path),
+                        "--no-wandb",
+                    ],
+                    cwd=str(workspace_root),
                     stdout=handle,
                     stderr=subprocess.STDOUT,
                 )
