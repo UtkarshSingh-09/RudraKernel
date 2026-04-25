@@ -62,21 +62,9 @@ def test_step25_cli_runs_and_prints_summary(tmp_path: Path) -> None:
     assert Path(payload["metrics_path"]).exists()
 
 
-def test_step25_colab_notebook_exists_and_references_training_entrypoint() -> None:
+def test_step25_colab_guide_exists() -> None:
     root = Path(__file__).resolve().parents[2]
-    notebook_path = root / "training" / "colab_notebook.ipynb"
-    assert notebook_path.exists(), "Missing Step 25 Colab notebook."
-
-    payload = json.loads(notebook_path.read_text(encoding="utf-8"))
-    cells = payload.get("cells", [])
-    cell_sources: list[str] = []
-
-    for cell in cells:
-        source = cell.get("source", [])
-        if isinstance(source, list):
-            cell_sources.append("".join(str(item) for item in source))
-        elif isinstance(source, str):
-            cell_sources.append(source)
-
-    joined = "\n".join(cell_sources)
-    assert "training.grpo_train" in joined, "Notebook must run training.grpo_train."
+    guide_path = root / "training" / "GRPO_COLAB_GUIDE.md"
+    assert guide_path.exists(), "Missing Step 25 Colab guide."
+    content = guide_path.read_text(encoding="utf-8")
+    assert "grpo_train_unsloth" in content, "Guide must reference grpo_train_unsloth."
