@@ -31,4 +31,7 @@ jobs:
         run: mypy siege_env
 
       - name: Pytest
-        run: pytest tests/master_suite.py --cov=siege_env --cov-fail-under=0
+        run: pytest tests/master_suite.py --cov=siege_env --cov-fail-under=85
+
+      - name: OpenEnv manifest validation
+        run: openenv validate openenv.yaml

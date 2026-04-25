@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from siege_env.agents import NPCPopulation
 from siege_env.incidents import load_templates
-from siege_env.models import SIEGEAction, SIEGEObservation, SIEGEState
+from siege_env.models import PostmortemArgs, SIEGEAction, SIEGEObservation, SIEGEState
 from siege_env.rewards.aggregator import aggregate_rewards
 
 try:
@@ -217,8 +217,8 @@ def _build_observation_with_cascade(self: SIEGEEnvironment, *, template, action_
     return obs
 
 
-SIEGEEnvironment.step = _step_with_cascade
-SIEGEEnvironment._build_observation = _build_observation_with_cascade
+SIEGEEnvironment.step = _step_with_cascade  # type: ignore[method-assign]
+SIEGEEnvironment._build_observation = _build_observation_with_cascade  # type: ignore[method-assign]
 
 # Step 15 append-only integration: information asymmetry visibility filtering
 from siege_env.mechanics.info_asymmetry import (
@@ -242,7 +242,7 @@ def _build_observation_with_asymmetry(self: SIEGEEnvironment, *, template, actio
     return obs
 
 
-SIEGEEnvironment._build_observation = _build_observation_with_asymmetry
+SIEGEEnvironment._build_observation = _build_observation_with_asymmetry  # type: ignore[method-assign]
 
 # Step 16 append-only integration: whisper/private channels
 from siege_env.mechanics.whisper import build_whisper_event
@@ -289,8 +289,8 @@ def _build_observation_with_whispers(self: SIEGEEnvironment, *, template, action
     return obs
 
 
-SIEGEEnvironment.step = _step_with_whispers
-SIEGEEnvironment._build_observation = _build_observation_with_whispers
+SIEGEEnvironment.step = _step_with_whispers  # type: ignore[method-assign]
+SIEGEEnvironment._build_observation = _build_observation_with_whispers  # type: ignore[method-assign]
 
 # Step 16 append-only fix: ensure returned step observation includes latest whispers
 _ORIG_STEP_STEP16_SYNC = SIEGEEnvironment.step
@@ -304,13 +304,13 @@ def _step_with_whispers_synced_observation(self: SIEGEEnvironment, action_payloa
     return obs, reward, done, info
 
 
-SIEGEEnvironment.step = _step_with_whispers_synced_observation
+SIEGEEnvironment.step = _step_with_whispers_synced_observation  # type: ignore[method-assign]
 
 # Step 17 append-only integration: red herrings + R9-enabled reward aggregation binding
 from siege_env.mechanics.red_herrings import generate_red_herrings
 from siege_env.rewards import aggregator as _aggregator_step17
 
-aggregate_rewards = _aggregator_step17.aggregate_rewards
+aggregate_rewards = _aggregator_step17.aggregate_rewards  # noqa: F811
 _ORIG_BUILD_OBS_STEP17 = SIEGEEnvironment._build_observation
 
 
@@ -323,7 +323,7 @@ def _build_observation_with_red_herrings(self: SIEGEEnvironment, *, template, ac
     return obs
 
 
-SIEGEEnvironment._build_observation = _build_observation_with_red_herrings
+SIEGEEnvironment._build_observation = _build_observation_with_red_herrings  # type: ignore[method-assign]
 
 # Step 18 append-only integration: severity escalation binding for R8 + obs metadata
 from siege_env.mechanics.severity_escalation import compute_incident_severity
@@ -350,8 +350,8 @@ def _build_observation_with_severity(self: SIEGEEnvironment, *, template, action
     return obs
 
 
-SIEGEEnvironment.step = _step_with_severity_r8
-SIEGEEnvironment._build_observation = _build_observation_with_severity
+SIEGEEnvironment.step = _step_with_severity_r8  # type: ignore[method-assign]
+SIEGEEnvironment._build_observation = _build_observation_with_severity  # type: ignore[method-assign]
 
 # Step 19 append-only integration: postmortem capture in step/info and observation metadata
 _ORIG_STEP_STEP19 = SIEGEEnvironment.step
@@ -369,7 +369,11 @@ def _step_with_postmortem_capture(self: SIEGEEnvironment, action_payload):
     except Exception:  # pragma: no cover
         action = None
 
-    if action is not None and action.tool_name == "postmortem":
+    if (
+        action is not None
+        and action.tool_name == "postmortem"
+        and isinstance(action.arguments, PostmortemArgs)
+    ):
         self._last_postmortem = {
             "root_cause": action.arguments.root_cause,
             "timeline": [
@@ -392,8 +396,8 @@ def _build_observation_with_postmortem(self: SIEGEEnvironment, *, template, acti
     return obs
 
 
-SIEGEEnvironment.step = _step_with_postmortem_capture
-SIEGEEnvironment._build_observation = _build_observation_with_postmortem
+SIEGEEnvironment.step = _step_with_postmortem_capture  # type: ignore[method-assign]
+SIEGEEnvironment._build_observation = _build_observation_with_postmortem  # type: ignore[method-assign]
 
 # Step 19 append-only fix: sync last_postmortem into the returned step observation
 _ORIG_STEP_STEP19_SYNC = SIEGEEnvironment.step
@@ -406,7 +410,7 @@ def _step_with_postmortem_synced_observation(self: SIEGEEnvironment, action_payl
     return obs, reward, done, info
 
 
-SIEGEEnvironment.step = _step_with_postmortem_synced_observation
+SIEGEEnvironment.step = _step_with_postmortem_synced_observation  # type: ignore[method-assign]
 
 # Step 20 append-only integration: frozen opponent league roster at reset
 from siege_env.league.opponent_pool import FrozenOpponentPool
@@ -434,8 +438,8 @@ def _build_observation_with_league(self: SIEGEEnvironment, *, template, action_e
     return obs
 
 
-SIEGEEnvironment.reset = _reset_with_league
-SIEGEEnvironment._build_observation = _build_observation_with_league
+SIEGEEnvironment.reset = _reset_with_league  # type: ignore[method-assign]
+SIEGEEnvironment._build_observation = _build_observation_with_league  # type: ignore[method-assign]
 
 # Step 21 append-only integration: deterministic replay event logging
 from pathlib import Path
@@ -466,4 +470,4 @@ def _step_with_replay_logging(self: SIEGEEnvironment, action_payload):
     return obs, reward, done, info
 
 
-SIEGEEnvironment.step = _step_with_replay_logging
+SIEGEEnvironment.step = _step_with_replay_logging  # type: ignore[method-assign]

@@ -126,10 +126,7 @@ class PathogenStrategy:
                 likelihood_untrusted = 1.0 - p_correct_if_untrusted
 
             numerator = likelihood_trusted * trust
-            denominator = (
-                likelihood_trusted * trust
-                + likelihood_untrusted * (1.0 - trust)
-            )
+            denominator = likelihood_trusted * trust + likelihood_untrusted * (1.0 - trust)
             trust = numerator / denominator if denominator > 0.0 else trust
 
         return trajectory

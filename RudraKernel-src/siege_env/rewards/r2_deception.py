@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 
 def compute_r2_deception(
@@ -20,3 +21,10 @@ def compute_r2_deception(
     if action.arguments.root_cause == ground_truth_root_cause:
         return 0.0
     return 1.0
+
+
+R2_RUBRIC = Rubric(
+    key="r2_deception",
+    description="Pathogen reward for successful deceptive diagnosis.",
+    scorer=compute_r2_deception,
+)

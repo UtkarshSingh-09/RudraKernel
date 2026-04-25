@@ -8,9 +8,9 @@ from siege_env.models import SIEGEAction
 from siege_env.rewards.r1_resolution import compute_r1_resolution
 from siege_env.rewards.r2_deception import compute_r2_deception
 from siege_env.rewards.r3_detection import compute_r3_detection
-from siege_env.rewards.r4_trust_calibration import compute_r4_trust_calibration
-from siege_env.rewards.r5_confidence import compute_r5_confidence
-from siege_env.rewards.r6_temporal import compute_r6_temporal
+from siege_env.rewards.r4_trust_calibration import R4_RUBRIC, compute_r4_trust_calibration
+from siege_env.rewards.r5_confidence import R5_RUBRIC, compute_r5_confidence
+from siege_env.rewards.r6_temporal import R6_RUBRIC, compute_r6_temporal
 
 
 def aggregate_rewards(
@@ -60,7 +60,7 @@ def aggregate_rewards(
 
 
 # Step 17 append-only extension: include R9 correlation reward
-from siege_env.rewards.r9_correlation import compute_r9_correlation
+from siege_env.rewards.r9_correlation import R9_RUBRIC, compute_r9_correlation
 
 _ORIGINAL_AGGREGATE_REWARDS_STEP17 = aggregate_rewards
 
@@ -96,7 +96,7 @@ def aggregate_rewards(
 
 
 # Step 18 append-only extension: include R8 severity-speed reward
-from siege_env.rewards.r8_severity_speed import compute_r8_severity_speed
+from siege_env.rewards.r8_severity_speed import R8_RUBRIC, compute_r8_severity_speed
 
 _ORIGINAL_AGGREGATE_REWARDS_STEP18 = aggregate_rewards
 
@@ -129,7 +129,22 @@ def aggregate_rewards(
 
 
 # Step 19 append-only extension: include R7 postmortem quality reward
-from siege_env.rewards.r7_postmortem import compute_r7_postmortem
+from siege_env.rewards.r1_resolution import R1_RUBRIC
+from siege_env.rewards.r2_deception import R2_RUBRIC
+from siege_env.rewards.r3_detection import R3_RUBRIC
+from siege_env.rewards.r7_postmortem import R7_RUBRIC, compute_r7_postmortem
+
+COMPOSED_RUBRICS = [
+    R1_RUBRIC,
+    R2_RUBRIC,
+    R3_RUBRIC,
+    R4_RUBRIC,
+    R5_RUBRIC,
+    R6_RUBRIC,
+    R7_RUBRIC,
+    R8_RUBRIC,
+    R9_RUBRIC,
+]
 
 _ORIGINAL_AGGREGATE_REWARDS_STEP19 = aggregate_rewards
 

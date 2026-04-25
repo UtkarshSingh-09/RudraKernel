@@ -1,7 +1,39 @@
 # CURRENT CONTEXT
 
-- Updated: 2026-04-24T18:37:11.100537+00:00
-- Latest step touched: 12 - Confidence Calibration + R5
+- Updated: 2026-04-25T12:00:00Z
+- Latest batch: Remediation + Lint/Format/Type cleanup pass
+- Steps 0-24: ALL COMPLETE ✅
+- Master suite: **150 passed, 2 skipped** (exit 0)
+- Ruff check: **PASS** (0 violations)
+- Ruff format: **PASS** (84 files clean)
+- Mypy: **72 pre-existing errors** (step-append pattern — NOT introduced this session)
+
+## What's Working
+- All 24 steps implemented and gate-tested
+- OpenEnv API: `/env/reset`, `/env/step`, `/env/state`, `/health` all live
+- `siege_env/client.py` (`SIEGEEnv`) importable with no hard deps
+- All 9 rewards export `Rubric` objects + `COMPOSED_RUBRICS` assembled
+- `tests/unit/test_openenv_api.py`: 3/3 passing
+- Gradio demo: step_24 gate passes (graceful skip when gradio absent)
+- All infra files present: Dockerfile, docker-compose, CI workflows, mypy.ini, .ruff.toml
+- All docs scaffolded: BLOG.md, PITCH.md, ARCHITECTURE.md, REWARD_HACKING_AUDIT.md, ABLATION_RESULTS.md
+- IMPLEMENTATION_PLAN.md: Section 12 (Hackathon Addendum) merged from 4 official morning docs
+
+## What's Next (Phase C)
+- Step 25: GRPO Training Script (Unsloth/TRL) — Utkarsh lead + Ankit
+- Step 26: HF Space Deployment — Ankit lead + Utkarsh
+- Step 27: Docs/Video/Pitch finalization — Both
+
+## Known Issues
+- Mypy 72 pre-existing errors: `no-redef` (aggregator.py step-append), `union-attr` (rewards files), `arg-type` (siege_environment.py Literals). Not blocking. Schedule dedicated cleanup before Step 27 submission freeze.
+- Gradio not installed: Step 24 tests skip gracefully (2 skips in master suite).
+- HF Space not yet deployed: pending Step 26.
+
+## Open Questions for Next Session
+- Which Unsloth GRPO recipe to use as base for training/grpo_train.py? (Recommendation: Advanced Qwen3 4B — see IMPLEMENTATION_PLAN.md §12.9)
+- Confirm model size for Tier-2 NPCs (llm_driven.py stub — Qwen 0.5B vs TinyLlama)
+
+
 - Current status: Step 12 in sync with the repository
 - Gate test: PASS (5/5)
 - Master suite: PASS (87 passed)

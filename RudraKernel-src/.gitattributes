@@ -1,0 +1,7 @@
+# Keep text files normalized and preserve line endings policy
+* text=auto
+
+# Do not track large video binaries in repository history
+*.mp4 -text
+*.mov -text
+*.webm -text

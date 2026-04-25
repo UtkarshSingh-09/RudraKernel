@@ -40,6 +40,7 @@ This is the metric judges will see in the final leaderboard.
 from __future__ import annotations
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 # ---------------------------------------------------------------------------
 # Stateless per-action R5
@@ -123,3 +124,10 @@ class ConfidenceCalibrator:
     def num_recorded(self) -> int:
         """Number of diagnose actions recorded so far."""
         return self._count
+
+
+R5_RUBRIC = Rubric(
+    key="r5_confidence",
+    description="Calibration of diagnosis confidence against correctness.",
+    scorer=compute_r5_confidence,
+)

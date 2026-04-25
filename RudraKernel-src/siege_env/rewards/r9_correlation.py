@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 FALSE_CORRELATION = "type1_false_correlation"
 
@@ -26,3 +27,10 @@ def compute_r9_correlation(
 
     claim_root = str(claim.get("root_cause", "")).strip()
     return 1.0 if claim_root and claim_root != ground_truth_root_cause else 0.0
+
+
+R9_RUBRIC = Rubric(
+    key="r9_correlation",
+    description="Reward for identifying false-correlation flawed claims.",
+    scorer=compute_r9_correlation,
+)

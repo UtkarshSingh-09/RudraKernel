@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 
 def compute_r7_postmortem(action: SIEGEAction, *, ground_truth_root_cause: str) -> float:
@@ -27,3 +28,10 @@ def compute_r7_postmortem(action: SIEGEAction, *, ground_truth_root_cause: str) 
         score -= 0.2
 
     return max(0.0, min(1.0, round(score, 4)))
+
+
+R7_RUBRIC = Rubric(
+    key="r7_postmortem",
+    description="Quality and correctness of postmortem synthesis.",
+    scorer=compute_r7_postmortem,
+)

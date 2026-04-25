@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 
 def compute_r1_resolution(action: SIEGEAction, ground_truth_root_cause: str) -> float:
@@ -15,3 +16,10 @@ def compute_r1_resolution(action: SIEGEAction, ground_truth_root_cause: str) -> 
     if predicted_root_cause == ground_truth_root_cause:
         return 1.0
     return 0.0
+
+
+R1_RUBRIC = Rubric(
+    key="r1_resolution",
+    description="Correct root-cause diagnosis accuracy.",
+    scorer=compute_r1_resolution,
+)

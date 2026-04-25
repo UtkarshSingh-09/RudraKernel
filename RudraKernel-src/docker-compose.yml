@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  siege-env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: siege-env:local
+    container_name: siege-env-local
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

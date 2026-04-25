@@ -25,3 +25,9 @@
 | 22 | Held-Out Eval + Ablation Harness | Ankit | ✅ | PASS | 2026-04-24 |
 | 23 | W&B Integration + Committed PNG Plots | Ankit | ✅ | PASS | 2026-04-24 |
 | 24 | Gradio Money Shot Frontend | Ankit | ✅ | PASS | 2026-04-24 |
+| — | **Remediation batch** | Utkarsh (AI) | ✅ | 150/150 master suite | 2026-04-25 |
+| — | **Lint/format/type cleanup** | Utkarsh | ✅ | ruff clean, mypy 72 pre-existing | 2026-04-25 |
+| — | **Plan Section 12 addendum** | Utkarsh | ✅ | Merged from 4 official docs | 2026-04-25 |
+| 25 | GRPO Training Script | Utkarsh + Ankit | ⏸ Pending | — | — |
+| 26 | HF Space Deployment | Ankit + Utkarsh | ⏸ Pending | — | — |
+| 27 | Docs / Blog / Video / Pitch | Both | ⏸ Pending | — | — |

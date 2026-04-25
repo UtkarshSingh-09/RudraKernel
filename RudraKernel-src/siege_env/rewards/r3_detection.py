@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 
 def compute_r3_detection(
@@ -27,3 +28,10 @@ def compute_r3_detection(
 
     challenged_root_cause = challenged_claim.get("root_cause")
     return 1.0 if challenged_root_cause != ground_truth_root_cause else 0.0
+
+
+R3_RUBRIC = Rubric(
+    key="r3_detection",
+    description="Immune reward for correctly challenging false claims.",
+    scorer=compute_r3_detection,
+)

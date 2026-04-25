@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Mapping
 
+from siege_env.rewards.rubric import Rubric
+
 
 def compute_r4_trust_calibration(
     *,
@@ -25,3 +27,10 @@ def compute_r4_trust_calibration(
     mean_brier = brier_sum / len(common_agent_ids)
     score = 1.0 - mean_brier
     return round(max(0.0, min(1.0, score)), 6)
+
+
+R4_RUBRIC = Rubric(
+    key="r4_trust_calibration",
+    description="Brier-score calibration of trust scores vs reliability.",
+    scorer=compute_r4_trust_calibration,
+)

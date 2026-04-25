@@ -27,6 +27,7 @@ function with no hidden state — easy to test and compose.
 from __future__ import annotations
 
 from siege_env.models import SIEGEAction
+from siege_env.rewards.rubric import Rubric
 
 
 def compute_r6_temporal(
@@ -57,3 +58,10 @@ def compute_r6_temporal(
         return 0.0
 
     return round(urgency_multiplier, 4)
+
+
+R6_RUBRIC = Rubric(
+    key="r6_temporal",
+    description="Temporal efficiency reward for fast correct diagnosis.",
+    scorer=compute_r6_temporal,
+)

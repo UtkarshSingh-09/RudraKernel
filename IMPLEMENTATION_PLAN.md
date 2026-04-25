@@ -1131,6 +1131,184 @@ Total: ~40 files across config, brain, tests/step_tests, scripts, .github/
 
 ---
 
+## 12. HACKATHON RESOURCES & GUIDANCE ADDENDUM (2026-04-25)
+
+**Status:** Additive merge from four official documents released 2026-04-25 morning:
+- *OpenEnv_Hackathon_Resources* (Scaler / Meta-PyTorch)
+- *[External] OpenEnv Hackathon FAQs* (59 Q&A)
+- *[External] Meta OpenEnv Hackathon Participant Help Guide*
+- *[External] Apr '26 OpenEnv Hackathon Themes + Judges' Rubric*
+
+This section is **purely additive**. It does not change Phase A/B/C boundaries, step ownership, or step scope (Steps 0-24 are already implemented and validated). Items below are clarifications, references, and acceptance criteria refinements that downstream steps (25-27) and final submission must comply with.
+
+### 12.1 Official Judging Rubric (locked weights)
+
+| Criterion | Weight | What it measures |
+|-----------|--------|------------------|
+| **Environment Innovation** | 40% | Is the env novel, creative, genuinely challenging? Does it test agent behavior in a way that hasn't been done before? |
+| **Storytelling & Presentation** | 30% | Can you explain the problem, env, agent behavior to a non-technical audience? Is the demo engaging? |
+| **Showing Improvement in Rewards** | 20% | Observable evidence: reward curves, before/after, baseline comparison. |
+| **Reward & Training Pipeline** | 10% | Reward logic coherent? Pipeline produces meaningful improvement? |
+
+**Implication for SIEGE:** Innovation is the largest bucket. Our composable Rubric system (R1-R9), trust-poisoning curriculum, and adversarial epistemic mechanics are the differentiators — README/blog/pitch must lead with these, not with infra.
+
+### 12.2 Minimum Submission Requirements (non-negotiable per Themes doc)
+
+These are gate items the judges check programmatically by pulling the submitted URL:
+
+- ☐ Built on **OpenEnv (latest release)** — not a custom interface
+- ☐ **Working training script** using **Unsloth or HF TRL**, ideally as a **Colab notebook** judges can re-run
+- ☐ **Evidence of real training**: at minimum **loss AND reward plots** from a real run (not just reward)
+- ☐ **Short writeup**: HF mini-blog OR <2-min YouTube video OR slide deck (we ship all three)
+- ☐ Environment hosted on **Hugging Face Spaces**
+- ☐ **README** that motivates the problem, explains how the env works, shows results, AND links to: HF Space, Colab, W&B run URLs, video, blog, slides
+- ☐ **No large video files** committed to the HF Space repo — YouTube URL only
+- ☐ **One submission per team** — the URL submitted is the URL judges pull. Commits after the deadline are ignored.
+
+### 12.3 Engineering Compliance Checklist (per Themes doc "Engineer it cleanly")
+
+- ☐ Use OpenEnv's `Environment` / `MCPEnvironment` base classes properly (we use `MCPEnvironment` per ADR — Step 04)
+- ☐ Respect **client / server separation** — `siege_env/client.py` must NOT import from `siege_env/server/` internals
+- ☐ Follow **Gym-style API**: `reset`, `step`, `state`
+- ☐ Valid `openenv.yaml` manifest
+- ☐ Do NOT use reserved tool names (`reset`, `step`, `state`, `close`) for any MCP tool — our 6 tools are `diagnose / challenge / ratify / escalate / whisper / postmortem`
+
+### 12.4 SIEGE Theme Mapping (for README/blog framing)
+
+SIEGE primarily targets **Theme #1 — Multi-Agent Interactions** (cooperation/competition/coalition formation, theory-of-mind under partial observability), with significant overlap into **Theme #4 — Self-Improvement** (curriculum-driven adversarial co-evolution: pathogen strategies escalate alongside immune skill) and **Theme #5 — Wild Card** (epistemic warfare framing is genuinely novel). README/pitch should explicitly name Theme #1 as primary, #4 as secondary.
+
+### 12.5 RLVE Positioning (new vocabulary judges expect)
+
+The FAQs introduce a precise distinction we should adopt in writeups:
+
+- **RLVR** = Reinforcement Learning with **Verifiable Rewards** (programmatic check on a fixed/semi-fixed prompt set).
+- **RLVE** = Reinforcement Learning with **Verifiable Environments** (procedurally generates tasks, adjustable difficulty, algorithmic reward — keeps the model near its capability frontier and avoids saturation).
+
+**SIEGE is RLVE, not RLVR.** Our incident generator (Step 03 + Step 14) procedurally produces parametric variants from 20 templates, the curriculum scheduler (Step 09) adjusts difficulty as the immune side improves, and rewards R1-R9 are all algorithmic. README and blog should call this out explicitly — it is exactly the property the RLVE paper (arxiv 2511.07317 referenced in FAQs) argues prevents the "static dataset saturation" failure mode.
+
+### 12.6 Reward-Design Refinements (already aligned, captured for traceability)
+
+The OpenEnv reward-design guide (FAQ Q27-30, Q38-44) and Help Guide §7-8 reaffirm SIEGE's existing approach:
+
+- **Multiple independent reward functions** > single signal — covered by R1-R9 Rubric composition (Step 08 ADR).
+- **Start simple, shape carefully** — Step 04 ships R1 only; later steps add R2-R9 incrementally.
+- **Anti-cheat constraints layered with success criteria** — covered by `tests/integration/test_reward_hacking.py` (9 exploits, Steps 08/12/17/18/19).
+- **Holdout evaluator separate from training reward** — covered by Step 22 held-out split.
+- **Adversarially test rewards yourself before the model does** — codified in our exploit policies fixture (`tests/fixtures/exploit_policies.py`).
+
+No structural change required. README must surface these properties in the "Why does it matter" section.
+
+### 12.7 Common Pitfalls Watchlist (from FAQs §31-58 + Help Guide §21)
+
+Track these during Steps 25-27. Each is mapped to the existing safeguard:
+
+| Pitfall | SIEGE safeguard |
+|---------|-----------------|
+| Verifier too brittle (rule-based false negatives) | Bayesian trust + multi-signal R1-R9 |
+| Verifier too permissive (LLM-judge gaming) | LLM-as-judge never used as sole signal — only as one of 9 rubric components |
+| Static task difficulty saturation | Tiered curriculum scheduler (Step 09) |
+| Narrow environment diversity | 20 templates × parametric variants (Step 14) |
+| Long-horizon sparse-reward stall | Process-aware R6 temporal + R8 severity-speed |
+| Reward hacking shortcuts | Per-reward exploit tests + audit doc (`docs/REWARD_HACKING_AUDIT.md`) |
+| Unbalanced env mixture | Curriculum samples across tiers explicitly |
+| Monitoring only headline reward | W&B logs **per-component reward + verifier pass-rate + timeout rate + format adherence + diversity of successful solutions** (Step 23) |
+| Saving QLoRA wrong | **Do NOT upcast a 4-bit model to 16-bit then merge LoRA weights naively** — use Unsloth's documented merged-save path. Codify in `training/grpo_train.py` and test inference immediately after save. |
+
+### 12.8 Pre-Training Sequencing (Help Guide §3, §14, §16)
+
+Reaffirms our Phase C order. Before any large GRPO run in Step 25, this debugging order is mandatory (cheap, fast, prevents wasted compute):
+
+1. Manual environment debug (reset/step/state by hand)
+2. Verifier debug (each Rubric tested in isolation)
+3. **Scripted baseline policy** rollout (no model — just rule-based actions)
+4. **Frozen model** rollout (instruct model, zero-shot, no training)
+5. **Tiny RL experiment** (~50 episodes, watch generations live for hacking)
+6. Scale only after the loop is stable
+
+Items 1-4 are already covered by existing tests and the league system (Step 20). Item 5 is the Step 25 gate test ("50-episode mini-run"). Item 6 is the post-Step-25 scale-up.
+
+### 12.9 GRPO + Unsloth Implementation Notes (FAQs §9, §59)
+
+- **GRPO vs PPO**: GRPO removes the value model, uses group-relative advantage from sampled outputs in a group, more memory-efficient. Required for Step 25.
+- **Reference recipes** (pick one as starting template for `training/grpo_train.py` + Colab):
+  - **Simplest start**: Qwen2.5 (3B) GRPO notebook or Gemma 3 (1B) GRPO notebook
+  - **Reward-engineering focus** (recommended for SIEGE): **Advanced Qwen3 (4B) GRPO** notebook — adds proximity scoring, advanced templates, and "prefinetuning to skip GRPO format learning"
+  - **Environment-style RL**: GPT-OSS 20B + 2048 game GRPO notebook (closest analog to SIEGE's environment-driven loop)
+  - **Guided learning path**: HF LLM Course "Practical Exercise: GRPO with Unsloth"
+- **Known Unsloth gaps to plan around**: multi-turn GRPO with stepwise rewards is not yet first-class; pin Unsloth + TRL versions in `pyproject.toml` and test on a small run before scaling.
+- **Inference dominates runtime** in RL loops — that is why Unsloth is in the stack, not just for training memory.
+
+### 12.10 Plot & Artifact Requirements (Themes doc "Make your plots readable")
+
+Already encoded in Step 23. Restated as the canonical checklist:
+
+- Both axes labeled with units (x: "training step" / "episode"; y: "reward" / "loss" / "score")
+- Saved as `.png` or `.jpg` and **committed under `docs/plots/`** — not left only in Colab cells or deleted W&B runs
+- If W&B was used, include the **specific public W&B run URL** for each plot
+- Embedded in README with a **one-line caption per plot**
+- Multi-run comparisons (baseline vs trained, ablations) on **the same axes**
+- Mandatory plots: arms-race R2/R3, per-reward components, ablation comparison, generalization gap (train vs held-out)
+
+### 12.11 README "Tell a Story, Not an API Doc" Structure
+
+Per Themes doc, the README must answer these four questions in order, readable in 3-5 minutes:
+
+1. **Problem** — what capability gap or domain are we targeting? (Epistemic warfare in incident response — pathogen agents poison trust to ratify wrong fixes.)
+2. **Environment** — what does the agent see, do, and get rewarded for? (8-agent diagnostic chamber, 6 tools, 9 composable rubrics, 20 procedural incident templates.)
+3. **Results** — what changed after training? (Embed plots with captions: arms-race curve, before/after on identical incident, ablation table, held-out generalization.)
+4. **Why does it matter** — who would care, and why? (AI-Safety + multi-agent alignment: training models to detect deception under social pressure.)
+
+Already encoded in Step 27 acceptance. Listed here so it can't drift.
+
+### 12.12 Canonical Resource Links (single source of truth for citations)
+
+**OpenEnv core:**
+- Repo: https://github.com/meta-pytorch/OpenEnv
+- Docs: https://meta-pytorch.org/OpenEnv/
+- HF org: https://huggingface.co/openenv
+- HF spaces: https://huggingface.co/openenv/spaces
+- Tutorials: https://github.com/meta-pytorch/OpenEnv/tree/main/tutorial
+- Training examples: https://github.com/meta-pytorch/OpenEnv/tree/main/tutorial/examples
+- Environment examples: https://github.com/meta-pytorch/OpenEnv/tree/main/envs
+
+**Lectures / videos (chaptered, recommended):**
+- India 2026 chaptered lectures: https://openenv-india-apr-2026.lovable.app/
+- Mega Lecture (Module 1 — Why OpenEnv): https://www.youtube.com/watch?v=Jew4lhAiqnw&t=2401s
+- Mega Lecture (Module 3 — Deploying Envs, `openenv init` / `openenv push` / Docker run): https://www.youtube.com/watch?v=Jew4lhAiqnw&t=5400s
+- Mega Lecture (Module 5 — Training + TRL, Wordle GRPO walkthrough): https://www.youtube.com/watch?v=Jew4lhAiqnw&t=6800s
+- Workshop (Module 4 — Building Your Own): https://www.youtube.com/watch?v=1jU05MlENOI&t=2625s
+- Other: https://www.youtube.com/watch?v=0airz7BhBiA, https://www.youtube.com/watch?v=ap4q4sAK4OY, https://www.youtube.com/live/kkCNMz0Ptd8
+
+**Reward engineering — research papers:**
+- arxiv 2408.10215 (reward engineering)
+- arxiv 2601.19100 (reward engineering)
+- DeepMind on specification gaming (Google DeepMind blog)
+- Lilian Weng on reward hacking (lilianweng.github.io)
+- RLVE / adaptive verifiable environments (arxiv via FAQs §22-23)
+- Verifier failure-modes study (arxiv via FAQs §31-33)
+
+**Training stack:**
+- TRL docs + GRPO trainer + GRPO cookbook (HuggingFace)
+- DeepSeekMath / GRPO paper (arxiv)
+- PPO paper (arxiv)
+- Unsloth repo + GRPO notebooks (Qwen2.5 3B, Llama 3.1 8B, Gemma 3 1B, Advanced Qwen3 4B, GPT-OSS 20B 2048)
+- BrowserGym (web-task environments) — reference only
+- Reasoning Gym (procedural reasoning tasks) — reference only
+
+These URLs belong in `docs/README.md` "References" section and `docs/BLOG.md` citations.
+
+### 12.13 Submission Freeze Protocol (Themes doc reaffirmation)
+
+Step 27's `SUBMISSION.md` and release tag are NOT optional. Restated for emphasis:
+
+1. The HF Space URL submitted on the form is the URL judges pull.
+2. Any commit after the submission deadline is ignored — even bug fixes.
+3. README must contain every link a judge needs (Space, Colab, W&B, video, blog, slides) — judges should not need to hunt.
+4. No large videos in the Space repo. Period.
+5. Both engineers sign `SUBMISSION.md`. Tag `v1.0-submission`. Done.
+
+---
+
 ## APPROVAL CHECKPOINTS
 
 Before execution begins, please confirm:
