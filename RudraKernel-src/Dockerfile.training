@@ -12,6 +12,9 @@ RUN pip install --no-cache-dir . && \
 
 # Force Python to flush stdout/stderr immediately (critical for HF Spaces logs)
 ENV PYTHONUNBUFFERED=1
+# Disable unsloth compiled cache (causes "already registered" errors in Docker)
+ENV UNSLOTH_COMPILE_DISABLE=1
+ENV TRITON_CACHE_DIR=/tmp/triton_cache
 
 # HF Spaces needs a server on port 8000 — the wrapper runs training + status page
 EXPOSE 8000
