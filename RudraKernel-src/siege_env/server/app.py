@@ -33,7 +33,8 @@ def _resolve_workspace_root() -> Path:
 
 
 workspace_root = _resolve_workspace_root()
-training_log_path = workspace_root / "artifacts/training/unsloth/train.log"
+runtime_output_dir = Path(os.getenv("TRAIN_OUTPUT_DIR", "/tmp/rudra_unsloth"))
+training_log_path = runtime_output_dir / "train.log"
 training_config_path = workspace_root / "training/configs/a100_grpo.yaml"
 
 
@@ -139,6 +140,8 @@ def train_start(x_train_key: str | None = Header(default=None)) -> dict[str, obj
                         "training.grpo_train_unsloth",
                         "--config",
                         str(training_config_path),
+                        "--output-dir",
+                        str(runtime_output_dir),
                         "--no-wandb",
                     ],
                     cwd=str(workspace_root),
