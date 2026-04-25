@@ -27,15 +27,18 @@ if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'CUDA av
 fi
 
 echo "=== Step 3: Clone and install project ==="
-if [ -d "${PROJECT_SUBDIR}" ] && [ -f "${PROJECT_SUBDIR}/pyproject.toml" ]; then
+if [ -f "pyproject.toml" ] && [ -d "training" ]; then
+  # Running from repository root already (HF Docker /app layout)
+  :
+elif [ -d "${PROJECT_SUBDIR}" ] && [ -f "${PROJECT_SUBDIR}/pyproject.toml" ]; then
   cd "${PROJECT_SUBDIR}"
 elif [ -d "${REPO_DIR}/${PROJECT_SUBDIR}" ] && [ -f "${REPO_DIR}/${PROJECT_SUBDIR}/pyproject.toml" ]; then
   cd "${REPO_DIR}/${PROJECT_SUBDIR}"
 else
-  if [ ! -d "${REPO_DIR}" ]; then
-    git clone --depth 1 "${REPO_URL}" "${REPO_DIR}"
-  fi
-  cd "${REPO_DIR}/${PROJECT_SUBDIR}"
+  echo "ERROR: Could not locate project root with pyproject.toml."
+  echo "Current directory: $(pwd)"
+  echo "Expected one of: ./, ./${PROJECT_SUBDIR}, ./${REPO_DIR}/${PROJECT_SUBDIR}"
+  exit 1
 fi
 
 pip install -q -e . --no-deps
