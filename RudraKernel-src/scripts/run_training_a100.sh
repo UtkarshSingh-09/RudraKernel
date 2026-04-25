@@ -31,18 +31,16 @@ if [ -f "pyproject.toml" ] && [ -d "training" ]; then
   :
 elif [ -d "${PROJECT_SUBDIR}" ] && [ -f "${PROJECT_SUBDIR}/pyproject.toml" ]; then
   cd "${PROJECT_SUBDIR}"
-elif [ -d "${REPO_DIR}/${PROJECT_SUBDIR}" ] && [ -f "${REPO_DIR}/${PROJECT_SUBDIR}/pyproject.toml" ]; then
-  cd "${REPO_DIR}/${PROJECT_SUBDIR}"
 else
   echo "ERROR: Could not locate project root with pyproject.toml."
   echo "Current directory: $(pwd)"
-  echo "Expected one of: ./, ./${PROJECT_SUBDIR}, ./${REPO_DIR}/${PROJECT_SUBDIR}"
+  echo "Expected one of: ./, ./${PROJECT_SUBDIR}"
   exit 1
 fi
 
 # Avoid editable install in Space runtime because /app can be read-only.
 # Running from repo root makes local packages importable via current working directory.
-export PYTHONPATH="$(pwd):${PYTHONPATH}"
+export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 mkdir -p "$OUTPUT_DIR"
 
 echo "=== Step 4: Run training ==="
