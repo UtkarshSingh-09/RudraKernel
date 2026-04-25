@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import threading
@@ -35,6 +36,7 @@ def _resolve_workspace_root() -> Path:
 workspace_root = _resolve_workspace_root()
 runtime_output_dir = Path(os.getenv("TRAIN_OUTPUT_DIR", "/tmp/rudra_unsloth"))
 training_log_path = runtime_output_dir / "train.log"
+training_metrics_path = runtime_output_dir / "metrics.json"
 training_config_path = workspace_root / "training/configs/a100_grpo.yaml"
 training_script_path = workspace_root / "scripts/run_training_a100.sh"
 
@@ -181,4 +183,31 @@ def train_logs(lines: int = 200, x_train_key: str | None = Header(default=None))
     return {
         "log_path": str(training_log_path),
         "lines": all_lines[-safe_lines:],
+    }
+
+
+@app.get("/train/result")
+def train_result(x_train_key: str | None = Header(default=None)) -> dict[str, object]:
+    """Return parsed metrics from the latest completed training run."""
+    _authorize_train(x_train_key)
+
+    if not training_metrics_path.exists():
+        return {
+            "available": False,
+            "metrics_path": str(training_metrics_path),
+            "status": _training_snapshot(),
+        }
+
+    try:
+        metrics = json.loads(training_metrics_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not parse metrics file at {training_metrics_path}: {exc}",
+        ) from exc
+
+    return {
+        "available": True,
+        "metrics_path": str(training_metrics_path),
+        "metrics": metrics,
     }
