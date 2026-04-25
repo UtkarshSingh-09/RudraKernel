@@ -47,13 +47,16 @@ else
 fi
 
 # Avoid editable install in Space runtime because /app can be read-only.
-# Running from repo root makes local packages importable via current working directory.
-export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
+# Running from repo root makes local packages importable via PYTHONPATH even when cwd changes.
+PROJECT_ROOT="$(pwd)"
+CONFIG_PATH="$PROJECT_ROOT/training/configs/a100_grpo.yaml"
+export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
 mkdir -p "$OUTPUT_DIR"
+cd "$OUTPUT_DIR"
 
 echo "=== Step 4: Run training ==="
 python -m training.grpo_train_unsloth \
-  --config training/configs/a100_grpo.yaml \
+  --config "$CONFIG_PATH" \
   --output-dir "$OUTPUT_DIR" \
   --no-wandb
 
