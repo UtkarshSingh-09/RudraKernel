@@ -12,6 +12,9 @@ def test_server_exposes_core_routes() -> None:
     assert "/env/reset" in routes
     assert "/env/step" in routes
     assert "/env/state" in routes
+    assert "/train/start" in routes
+    assert "/train/status" in routes
+    assert "/train/logs" in routes
 
 
 def test_reset_and_state_payload_shape() -> None:
