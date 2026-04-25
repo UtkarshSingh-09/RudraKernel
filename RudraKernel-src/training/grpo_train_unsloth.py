@@ -30,12 +30,22 @@ from typing import Any
 import torch
 import yaml
 
+UNSLOTH_IMPORT_ERROR: ImportError | None = None
+TRL_IMPORT_ERROR: ImportError | None = None
+
 try:
     from unsloth import FastLanguageModel
-    from trl import GRPOConfig, GRPOTrainer
     HAS_UNSLOTH = True
-except ImportError:
+except ImportError as exc:
     HAS_UNSLOTH = False
+    UNSLOTH_IMPORT_ERROR = exc
+
+try:
+    from trl import GRPOConfig, GRPOTrainer
+    HAS_TRL = True
+except ImportError as exc:
+    HAS_TRL = False
+    TRL_IMPORT_ERROR = exc
 
 try:
     import wandb
@@ -491,8 +501,16 @@ def main() -> int:
     
     # Validate
     if not HAS_UNSLOTH:
-        print("ERROR: Unsloth not installed.")
+        print("ERROR: Failed to import Unsloth.")
+        if UNSLOTH_IMPORT_ERROR is not None:
+            print(f"ImportError: {UNSLOTH_IMPORT_ERROR}")
         print("Run: pip install unsloth torch transformers trl datasets")
+        return 1
+    if not HAS_TRL:
+        print("ERROR: Failed to import TRL GRPO modules.")
+        if TRL_IMPORT_ERROR is not None:
+            print(f"ImportError: {TRL_IMPORT_ERROR}")
+        print("Run: pip install trl transformers")
         return 1
     
     # Train

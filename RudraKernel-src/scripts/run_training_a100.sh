@@ -37,6 +37,19 @@ pip install -q \
   wandb \
   pyyaml
 
+echo "=== Step 1b: Verify training imports ==="
+python - <<'PY'
+import importlib
+
+for module_name in ("unsloth", "trl", "transformers"):
+    module = importlib.import_module(module_name)
+    print(f"{module_name} version: {getattr(module, '__version__', 'unknown')}")
+
+from unsloth import FastLanguageModel  # noqa: F401
+from trl import GRPOConfig, GRPOTrainer  # noqa: F401
+print("Training imports OK")
+PY
+
 echo "=== Step 2: Verify CUDA ==="
 if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'Torch version: {torch.__version__}'); print(f'CUDA available: {ok}'); print(f'Device: {torch.cuda.get_device_name(0) if ok else \"CPU\"}'); sys.exit(0 if ok else 2)"; then
   echo "ERROR: No GPU detected. Run this script on HF Space/Notebook with A100 hardware enabled."
