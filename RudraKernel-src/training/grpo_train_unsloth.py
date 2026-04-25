@@ -379,6 +379,8 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     for _mn, _mo in list(_sys.modules.items()):
         if "unsloth_compiled_cache" in _mn:
             _mo.__dict__.setdefault("truncate_with_protected_tokens", _trunc_fn)
+            _mo.__dict__.setdefault("has_images", False)
+            _mo.__dict__.setdefault("images", None)
     
     # 8. Train
     logger.info("Starting GRPO training...")
