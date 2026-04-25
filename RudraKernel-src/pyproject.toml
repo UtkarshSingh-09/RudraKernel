@@ -26,6 +26,14 @@ dev = [
   "pre-commit>=3.7.0",
   "pyyaml>=6.0.0",
 ]
+grpo = [
+  "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git",
+  "trl>=0.7.0",
+  "transformers>=4.36.0",
+  "torch>=2.0.0",
+  "datasets>=2.14.0",
+  "wandb>=0.15.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["siege_env*"]
