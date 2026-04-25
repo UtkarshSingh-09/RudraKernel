@@ -21,6 +21,7 @@ import argparse
 import inspect
 import json
 import logging
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,9 +94,12 @@ class GRPOTrainingConfig:
     per_device_train_batch_size: int = 1  # Conserve VRAM for GRPO generation
     
     # Logging
-    log_to_wandb: bool = True
+    log_to_wandb: bool = False
     wandb_project: str = "rudra-kernel-grpo"
     output_dir: str = "artifacts/training/unsloth"
+    
+    # HF Hub — push trained LoRA after training
+    hub_model_id: str = "ankit-choubey/siege-grpo-lora"
     
     # Environment
     seed: int = 42
@@ -155,6 +159,15 @@ def collect_trajectories(
             if not candidate_causes:
                 candidate_causes = ["unknown_root_cause"]
             
+            # Extract real evidence from observation (min_length=1 required)
+            evidence_values: list[str] = []
+            for item in obs.available_evidence:
+                value = item.get("value")
+                if isinstance(value, str) and value.strip():
+                    evidence_values.append(value.strip())
+            if not evidence_values:
+                evidence_values = ["signal_unavailable"]
+            
             root_cause = rng.choice(candidate_causes)
             confidence = rng.uniform(0.5, 0.99)
             
@@ -167,7 +180,7 @@ def collect_trajectories(
                 "arguments": {
                     "root_cause": root_cause,
                     "confidence": confidence,
-                    "evidence": [],
+                    "evidence": evidence_values[:3],
                     "alternative_hypotheses": [],
                 },
             }
@@ -215,6 +228,15 @@ def build_siege_reward_func(seed: int, max_steps: int) -> Any:
                 env = SIEGEEnvironment(seed=seed + hash(completion) % 10000, max_steps=max_steps)
                 obs = env.reset()
                 
+                # Extract real evidence from observation (min_length=1 required)
+                evidence_values: list[str] = []
+                for item in obs.available_evidence:
+                    value = item.get("value")
+                    if isinstance(value, str) and value.strip():
+                        evidence_values.append(value.strip())
+                if not evidence_values:
+                    evidence_values = ["signal_unavailable"]
+                
                 # Extract root cause from completion text
                 root_cause = "unknown_root_cause"
                 for line in completion.split("\n"):
@@ -236,7 +258,7 @@ def build_siege_reward_func(seed: int, max_steps: int) -> Any:
                     "arguments": {
                         "root_cause": root_cause,
                         "confidence": rng.uniform(0.5, 0.95),
-                        "evidence": [],
+                        "evidence": evidence_values[:3],
                         "alternative_hypotheses": [],
                     },
                 }
@@ -402,11 +424,32 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     logger.info("Starting GRPO training...")
     train_result = trainer.train()
     
-    # 9. Save artifacts
+    # 9. Save artifacts locally
     final_model_path = output_dir / "final_model"
     model.save_pretrained(str(final_model_path))
     tokenizer.save_pretrained(str(final_model_path))
-    logger.info(f"✓ Model saved to {final_model_path}")
+    logger.info(f"✓ Model saved locally to {final_model_path}")
+    
+    # 10. Push to HF Hub (critical for ephemeral HF Spaces storage)
+    hf_token = os.environ.get("HF_TOKEN", "")
+    if config.hub_model_id and hf_token:
+        try:
+            from huggingface_hub import login as hf_login
+            hf_login(token=hf_token)
+            logger.info(f"Pushing model to HF Hub: {config.hub_model_id}")
+            model.push_to_hub(
+                config.hub_model_id,
+                tokenizer=tokenizer,
+                private=True,
+            )
+            tokenizer.push_to_hub(config.hub_model_id, private=True)
+            logger.info(f"✓ Model pushed to https://huggingface.co/{config.hub_model_id}")
+        except Exception as hub_exc:
+            logger.error(f"Failed to push to Hub: {hub_exc}")
+            logger.error("Model is saved locally — push manually if needed.")
+    elif config.hub_model_id and not hf_token:
+        logger.warning("hub_model_id is set but HF_TOKEN env var is missing — skipping Hub push.")
+        logger.warning("Set HF_TOKEN as a Space secret to auto-push after training.")
     
     # 10. Metrics
     duration = (datetime.now(UTC) - start_time).total_seconds()

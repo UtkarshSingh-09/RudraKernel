@@ -19,5 +19,8 @@ log_to_wandb: false
 wandb_project: rudra-kernel-grpo
 output_dir: artifacts/training/unsloth
 
+# Push trained LoRA to HF Hub (uses HF_TOKEN from env/secrets)
+hub_model_id: ankit-choubey/siege-grpo-lora
+
 seed: 42
 max_env_steps: 10
