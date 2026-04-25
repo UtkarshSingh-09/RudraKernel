@@ -2,10 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY pyproject.toml /app/pyproject.toml
-COPY README.md /app/README.md
-COPY siege_env /app/siege_env
-COPY openenv.yaml /app/openenv.yaml
+COPY . /app
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
