@@ -134,7 +134,7 @@ def train_start(x_train_key: str | None = Header(default=None)) -> dict[str, obj
                 )
 
             training_log_path.parent.mkdir(parents=True, exist_ok=True)
-            with training_log_path.open("ab") as handle:
+            with training_log_path.open("wb") as handle:
                 child_env = os.environ.copy()
                 child_env["TRAIN_OUTPUT_DIR"] = str(runtime_output_dir)
                 training_process = subprocess.Popen(

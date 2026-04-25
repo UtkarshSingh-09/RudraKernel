@@ -1,10 +1,8 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "=== A100 GRPO Training Pipeline ==="
 
-REPO_URL="https://github.com/UtkarshSingh-09/RudraKernel.git"
-REPO_DIR="RudraKernel"
 PROJECT_SUBDIR="RudraKernel-src"
 OUTPUT_DIR="${TRAIN_OUTPUT_DIR:-/tmp/rudra_unsloth}"
 VENV_DIR="${TRAIN_VENV_DIR:-/tmp/rudra_train_venv}"
@@ -17,11 +15,12 @@ source "$VENV_DIR/bin/activate"
 python -m pip install -q --upgrade pip
 
 echo "=== Step 1: Install dependencies ==="
-pip install -q --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio
-pip install -q unsloth "trl<0.20" datasets pyyaml transformers wandb
+# Install a modern torch that satisfies xformers/unsloth; avoid torchvision/torchaudio conflicts.
+pip install -q "torch>=2.10,<2.11"
+pip install -q unsloth "trl<0.20" datasets pyyaml transformers wandb accelerate
 
 echo "=== Step 2: Verify CUDA ==="
-if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'CUDA available: {ok}'); print(f'Device: {torch.cuda.get_device_name(0) if ok else \"CPU\"}'); sys.exit(0 if ok else 2)"; then
+if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'Torch version: {torch.__version__}'); print(f'CUDA available: {ok}'); print(f'Device: {torch.cuda.get_device_name(0) if ok else \"CPU\"}'); sys.exit(0 if ok else 2)"; then
   echo "ERROR: No GPU detected. Run this script on HF Space/Notebook with A100 hardware enabled."
   exit 1
 fi
@@ -44,6 +43,7 @@ fi
 # Avoid editable install in Space runtime because /app can be read-only.
 # Running from repo root makes local packages importable via current working directory.
 export PYTHONPATH="$(pwd):${PYTHONPATH}"
+mkdir -p "$OUTPUT_DIR"
 
 echo "=== Step 4: Run training ==="
 python -m training.grpo_train_unsloth \
@@ -52,13 +52,13 @@ python -m training.grpo_train_unsloth \
   --no-wandb
 
 echo "=== Step 5: Upload checkpoint ==="
-if [ -n "$HF_TOKEN" ]; then
+if [ -n "${HF_TOKEN:-}" ] && [ -d "$OUTPUT_DIR/final_model" ] && command -v huggingface-cli >/dev/null 2>&1; then
   huggingface-cli \
     upload ankit-choubey/Rudrakernel-unsloth \
     "$OUTPUT_DIR/final_model" . \
     --token "$HF_TOKEN"
 else
-  echo "Warning: HF_TOKEN not set. Skipping HF upload."
+  echo "Warning: HF upload skipped (missing token, model dir, or huggingface-cli)."
 fi
 
 echo "=== TRAINING COMPLETE ==="
