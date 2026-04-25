@@ -348,9 +348,16 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     
     trainer = GRPOTrainer(**trainer_kwargs)
 
-    # Workaround: Unsloth compiled GRPOTrainer references attrs that don't
-    # exist for text-only models or specific tokenizer configs.
-    for _attr in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
+    # Workaround: Unsloth compiled GRPOTrainer references multimodal attrs
+    # that are missing for text-only models.
+    for _attr in (
+        "image_token_id",
+        "vision_start_token_id",
+        "vision_end_token_id",
+        "image_token",
+        "vision_start_token",
+        "vision_end_token",
+    ):
         if not hasattr(trainer, _attr):
             setattr(trainer, _attr, None)
     if not hasattr(trainer, "pad_token"):
