@@ -20,7 +20,9 @@ training_lock = threading.Lock()
 training_process: subprocess.Popen[bytes] | None = None
 training_started_at: float | None = None
 training_last_exit_code: int | None = None
-training_log_path = Path("artifacts/training/unsloth/train.log")
+project_root = Path(__file__).resolve().parents[2]
+training_log_path = project_root / "artifacts/training/unsloth/train.log"
+training_script_path = project_root / "scripts/run_training_a100.sh"
 
 
 class StepRequest(BaseModel):
@@ -108,14 +110,24 @@ def train_start(x_train_key: str | None = Header(default=None)) -> dict[str, obj
         if training_process is not None and training_process.poll() is None:
             return _training_snapshot()
 
-        training_log_path.parent.mkdir(parents=True, exist_ok=True)
-        with training_log_path.open("a", encoding="utf-8") as handle:
-            training_process = subprocess.Popen(
-                ["bash", "scripts/run_training_a100.sh"],
-                stdout=handle,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
+        if not training_script_path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Training script not found: {training_script_path}",
             )
+
+        training_log_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with training_log_path.open("a", encoding="utf-8") as handle:
+                training_process = subprocess.Popen(
+                    ["bash", str(training_script_path)],
+                    cwd=str(project_root),
+                    stdout=handle,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to start training process: {exc}") from exc
 
         training_started_at = time.time()
         training_last_exit_code = None
