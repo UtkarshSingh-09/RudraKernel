@@ -28,6 +28,10 @@ RUN pip install --no-cache-dir \
     "huggingface_hub>=0.20.0" \
     "pyyaml>=6.0.0"
 
+# Make /app writable by HF Spaces runtime user (UID 1000)
+RUN chown -R 1000:1000 /app && \
+    mkdir -p /home/user/.cache && chown -R 1000:1000 /home/user
+
 ENV PYTHONUNBUFFERED=1
 ENV UNSLOTH_COMPILE_DISABLE=1
 EXPOSE 8000
