@@ -6,9 +6,11 @@ echo "=== A100 GRPO Training Pipeline ==="
 REPO_URL="https://github.com/UtkarshSingh-09/RudraKernel.git"
 REPO_DIR="RudraKernel"
 PROJECT_SUBDIR="RudraKernel-src"
+OUTPUT_DIR="${TRAIN_OUTPUT_DIR:-/tmp/rudra_unsloth}"
 
 echo "=== Step 1: Install dependencies ==="
-pip install -q unsloth "trl<0.20" datasets pyyaml torch transformers wandb
+pip install -q --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio
+pip install -q unsloth "trl<0.20" datasets pyyaml transformers wandb
 
 echo "=== Step 2: Verify CUDA ==="
 if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'CUDA available: {ok}'); print(f'Device: {torch.cuda.get_device_name(0) if ok else \"CPU\"}'); sys.exit(0 if ok else 2)"; then
@@ -32,21 +34,19 @@ pip install -q -e . --no-deps
 
 echo "=== Step 4: Run training ==="
 python -m training.grpo_train_unsloth \
-  --model unsloth/Qwen2.5-7B-Instruct-bnb-4bit \
-  --episodes 200 \
-  --epochs 3 \
-  --output-dir artifacts/training/unsloth \
+  --config training/configs/a100_grpo.yaml \
+  --output-dir "$OUTPUT_DIR" \
   --no-wandb
 
 echo "=== Step 5: Upload checkpoint ==="
 if [ -n "$HF_TOKEN" ]; then
   huggingface-cli \
     upload ankit-choubey/Rudrakernel-unsloth \
-    artifacts/training/unsloth/final_model . \
+    "$OUTPUT_DIR/final_model" . \
     --token "$HF_TOKEN"
 else
   echo "Warning: HF_TOKEN not set. Skipping HF upload."
 fi
 
 echo "=== TRAINING COMPLETE ==="
-echo "Checkpoint saved to: artifacts/training/unsloth/final_model"
+echo "Checkpoint saved to: $OUTPUT_DIR/final_model"

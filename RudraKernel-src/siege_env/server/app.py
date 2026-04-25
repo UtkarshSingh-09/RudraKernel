@@ -36,6 +36,7 @@ workspace_root = _resolve_workspace_root()
 runtime_output_dir = Path(os.getenv("TRAIN_OUTPUT_DIR", "/tmp/rudra_unsloth"))
 training_log_path = runtime_output_dir / "train.log"
 training_config_path = workspace_root / "training/configs/a100_grpo.yaml"
+training_script_path = workspace_root / "scripts/run_training_a100.sh"
 
 
 class StepRequest(BaseModel):
@@ -124,29 +125,22 @@ def train_start(x_train_key: str | None = Header(default=None)) -> dict[str, obj
             if training_process is not None and training_process.poll() is None:
                 return _training_snapshot()
 
-            training_module = workspace_root / "training/grpo_train_unsloth.py"
-            if not training_module.exists():
+            if not training_script_path.exists():
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Training module not found: {training_module}",
+                    detail=f"Training script not found: {training_script_path}",
                 )
 
             training_log_path.parent.mkdir(parents=True, exist_ok=True)
             with training_log_path.open("ab") as handle:
+                child_env = os.environ.copy()
+                child_env["TRAIN_OUTPUT_DIR"] = str(runtime_output_dir)
                 training_process = subprocess.Popen(
-                    [
-                        "python",
-                        "-m",
-                        "training.grpo_train_unsloth",
-                        "--config",
-                        str(training_config_path),
-                        "--output-dir",
-                        str(runtime_output_dir),
-                        "--no-wandb",
-                    ],
+                    ["bash", str(training_script_path)],
                     cwd=str(workspace_root),
                     stdout=handle,
                     stderr=subprocess.STDOUT,
+                    env=child_env,
                 )
 
             training_started_at = time.time()
