@@ -6,6 +6,7 @@ echo "=== A100 GRPO Training Pipeline ==="
 PROJECT_SUBDIR="RudraKernel-src"
 OUTPUT_DIR="${TRAIN_OUTPUT_DIR:-/tmp/rudra_unsloth}"
 VENV_DIR="${TRAIN_VENV_DIR:-/tmp/rudra_train_venv}"
+MODEL_NAME="${TRAIN_MODEL_NAME:-unsloth/qwen2.5-3b-instruct-unsloth-bnb-4bit}"
 export PIP_CACHE_DIR="${PIP_CACHE_DIR:-/tmp/pip-cache}"
 # HF Space containers run with UID lacking /etc/passwd entry; provide USER for getpass.
 export USER="${USER:-hfuser}"
@@ -56,6 +57,7 @@ cd "$OUTPUT_DIR"
 
 echo "=== Step 4: Run training ==="
 python -m training.grpo_train_unsloth \
+  --model "$MODEL_NAME" \
   --config "$CONFIG_PATH" \
   --output-dir "$OUTPUT_DIR" \
   --no-wandb
