@@ -348,11 +348,13 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     
     trainer = GRPOTrainer(**trainer_kwargs)
 
-    # Workaround: Unsloth compiled GRPOTrainer references vision-token attrs
-    # that don't exist for text-only models (causes AttributeError at step 0).
+    # Workaround: Unsloth compiled GRPOTrainer references attrs that don't
+    # exist for text-only models or specific tokenizer configs.
     for _attr in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
         if not hasattr(trainer, _attr):
             setattr(trainer, _attr, None)
+    if not hasattr(trainer, "pad_token"):
+        trainer.pad_token = tokenizer.pad_token or ""
 
     # Workaround: Unsloth 2026.4.8 compiled cache references
     # truncate_with_protected_tokens without importing it.
