@@ -14,7 +14,6 @@ export HOME="${HOME:-/tmp/rudra_home}"
 export TORCHINDUCTOR_CACHE_DIR="${TORCHINDUCTOR_CACHE_DIR:-/tmp/torchinductor}"
 export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-/tmp/triton-cache}"
 export HF_HOME="${HF_HOME:-/tmp/hf-home}"
-export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-/tmp/hf-home/transformers}"
 mkdir -p "$HOME" "$TORCHINDUCTOR_CACHE_DIR" "$TRITON_CACHE_DIR" "$HF_HOME"
 
 echo "=== Step 0: Prepare writable Python env ==="
@@ -33,6 +32,7 @@ pip install -q \
   "peft==0.18.1" \
   "datasets==4.3.0" \
   "huggingface-hub==0.36.2" \
+  torchvision \
   accelerate \
   wandb \
   pyyaml
