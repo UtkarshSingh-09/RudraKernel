@@ -1,5 +1,9 @@
 FROM python:3.11-slim
 
+# HF Spaces runs as UID 1000 — must exist in /etc/passwd
+RUN useradd -m -u 1000 user
+ENV HOME=/home/user
+
 USER root
 WORKDIR /app
 
