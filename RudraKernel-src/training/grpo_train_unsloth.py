@@ -462,7 +462,7 @@ def main() -> int:
     
     # Train
     summary = run_grpo_training(config)
-    print(json.dumps(asdict(summary, default=str), indent=2))
+    print(json.dumps(asdict(summary), indent=2, default=str))
     return 0
 
 
