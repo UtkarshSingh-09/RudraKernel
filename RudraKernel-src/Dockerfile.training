@@ -16,4 +16,6 @@ ENV PYTHONUNBUFFERED=1
 # HF Spaces needs a server on port 8000 — the wrapper runs training + status page
 EXPOSE 8000
 
+# Clear the base image's ENTRYPOINT (it starts Jupyter by default)
+ENTRYPOINT []
 CMD ["python", "-u", "training/run_training_with_status.py"]
