@@ -1,0 +1,18 @@
+[
+  {
+    "id": "fixture_gitlab_variant",
+    "source_url": "https://about.gitlab.com/blog/2017/02/01/gitlab-dot-com-database-incident/",
+    "root_cause": "accidental_production_database_deletion",
+    "observable_signals": ["database_service_unavailable", "elevated_500_error_rate"],
+    "flaw_types": ["type3_tunnel_vision"],
+    "blast_radius": ["git_operations", "web_ui"]
+  },
+  {
+    "id": "fixture_cloudflare_variant",
+    "source_url": "https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/",
+    "root_cause": "catastrophic_regex_backtracking_in_waf_rule",
+    "observable_signals": ["global_cpu_saturation", "elevated_http_5xx"],
+    "flaw_types": ["type1_false_correlation"],
+    "blast_radius": ["edge_proxy_requests"]
+  }
+]
