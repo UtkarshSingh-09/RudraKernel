@@ -24,9 +24,18 @@ source "$VENV_DIR/bin/activate"
 python -m pip install -q --upgrade pip
 
 echo "=== Step 1: Install dependencies ==="
-# Install a modern torch that satisfies xformers/unsloth; avoid torchvision/torchaudio conflicts.
+# Match Unsloth's own tested text-training stack to avoid GRPO patch/version skew.
 pip install -q "torch>=2.10,<2.11"
-pip install -q unsloth "trl<0.20" datasets pyyaml transformers wandb accelerate
+pip install -q \
+  "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" \
+  "transformers==4.57.6" \
+  "trl==0.23.1" \
+  "peft==0.18.1" \
+  "datasets==4.3.0" \
+  "huggingface-hub==0.36.2" \
+  accelerate \
+  wandb \
+  pyyaml
 
 echo "=== Step 2: Verify CUDA ==="
 if ! python -c "import sys, torch; ok=torch.cuda.is_available(); print(f'Torch version: {torch.__version__}'); print(f'CUDA available: {ok}'); print(f'Device: {torch.cuda.get_device_name(0) if ok else \"CPU\"}'); sys.exit(0 if ok else 2)"; then
