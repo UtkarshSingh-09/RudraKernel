@@ -18,6 +18,7 @@ Phase C workflow:
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import logging
 from dataclasses import asdict, dataclass
@@ -55,7 +56,7 @@ class GRPOTrainingConfig:
     """Production GRPO training config with Unsloth + TRL."""
 
     # Model
-    model_name: str = "unsloth/Qwen2.5-4B-Instruct-bnb-4bit"
+    model_name: str = "unsloth/qwen2.5-3b-instruct-unsloth-bnb-4bit"
     max_seq_length: int = 2048
     load_in_4bit: bool = True
 
@@ -71,7 +72,7 @@ class GRPOTrainingConfig:
     max_trajectory_length: int = 512
     
     # Colab optimization
-    gradient_accumulation_steps: int = 2
+    gradient_accumulation_steps: int = 4
     per_device_train_batch_size: int = 2  # Colab GPU memory limit
     
     # Logging
@@ -237,21 +238,29 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
         )
         wandb_run_url = wandb.run.url if wandb.run else None
     
-    # 5. Configure GRPO trainer
-    training_config = GRPOConfig(
-        output_dir=str(output_dir),
-        num_train_epochs=config.num_train_epochs,
-        per_device_train_batch_size=config.per_device_train_batch_size,
-        gradient_accumulation_steps=config.gradient_accumulation_steps,
-        learning_rate=config.learning_rate,
-        weight_decay=config.weight_decay,
-        warmup_ratio=config.warmup_ratio,
-        num_mini_batches=config.num_mini_batches,
-        logging_steps=10,
-        save_steps=50,
-        report_to=["wandb"] if (config.log_to_wandb and HAS_WANDB) else [],
-        seed=config.seed,
-    )
+    # 5. Configure GRPO trainer (TRL/Unsloth APIs can differ across versions)
+    grpo_kwargs: dict[str, Any] = {
+        "output_dir": str(output_dir),
+        "num_train_epochs": config.num_train_epochs,
+        "per_device_train_batch_size": config.per_device_train_batch_size,
+        "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "learning_rate": config.learning_rate,
+        "weight_decay": config.weight_decay,
+        "warmup_ratio": config.warmup_ratio,
+        "num_mini_batches": config.num_mini_batches,
+        "logging_steps": 10,
+        "save_steps": 50,
+        "report_to": ["wandb"] if (config.log_to_wandb and HAS_WANDB) else [],
+        "seed": config.seed,
+    }
+
+    supported_grpo_args = set(inspect.signature(GRPOConfig.__init__).parameters.keys())
+    filtered_grpo_kwargs = {k: v for k, v in grpo_kwargs.items() if k in supported_grpo_args}
+    dropped_args = sorted(set(grpo_kwargs.keys()) - set(filtered_grpo_kwargs.keys()))
+    if dropped_args:
+        logger.info("Skipping unsupported GRPOConfig args for this TRL version: %s", dropped_args)
+
+    training_config = GRPOConfig(**filtered_grpo_kwargs)
     
     # 6. Create trainer
     trainer = GRPOTrainer(
@@ -301,7 +310,7 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     
     # Finalize W&B
     if config.log_to_wandb and HAS_WANDB:
-        wandb.log(asdict(summary, default=str))
+        wandb.log(asdict(summary))
         wandb.finish()
     
     logger.info(f"✓ Training complete in {duration:.1f}s")
