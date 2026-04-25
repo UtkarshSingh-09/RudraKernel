@@ -347,6 +347,12 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
         trainer_kwargs["tokenizer"] = tokenizer
     
     trainer = GRPOTrainer(**trainer_kwargs)
+
+    # Workaround: Unsloth compiled GRPOTrainer references vision-token attrs
+    # that don't exist for text-only models (causes AttributeError at step 0).
+    for _attr in ("image_token_id", "vision_start_token_id", "vision_end_token_id"):
+        if not hasattr(trainer, _attr):
+            setattr(trainer, _attr, None)
     
     # 8. Train
     logger.info("Starting GRPO training...")
