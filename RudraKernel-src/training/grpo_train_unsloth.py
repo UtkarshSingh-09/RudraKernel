@@ -172,16 +172,64 @@ def collect_trajectories(
 
 
 def format_trajectory_for_training(trajectory: dict[str, Any]) -> dict[str, Any]:
-    """Format trajectory as text for LLM training."""
+    """Format trajectory as prompt dict for GRPO dataset."""
     
     prompt = trajectory["prompt"]
     actions_text = "\n".join(f"  Step {i+1}: {a}" for i, a in enumerate(trajectory["actions"]))
-    completion = trajectory["completion"]
     
     return {
-        "prompt": f"{prompt}\n{actions_text}\n{completion}",
-        "reward": trajectory["total_reward"],
+        "prompt": [
+            {"role": "system", "content": "You are a site reliability engineer diagnosing incidents."},
+            {"role": "user", "content": f"{prompt}\n{actions_text}"},
+        ],
     }
+
+
+def build_siege_reward_func(seed: int, max_steps: int) -> Any:
+    """Build a reward function that scores completions using SIEGEEnv."""
+    
+    rng = Random(seed)
+    
+    def siege_reward_func(completions: list[str], **kwargs: Any) -> list[float]:
+        """Score each completion by running a SIEGEEnv episode."""
+        rewards = []
+        for i, completion in enumerate(completions):
+            try:
+                env = SIEGEEnvironment(seed=seed + hash(completion) % 10000, max_steps=max_steps)
+                obs = env.reset()
+                
+                # Extract root cause from completion text
+                root_cause = "unknown_root_cause"
+                for line in completion.split("\n"):
+                    if "root_cause" in line.lower():
+                        parts = line.split("=", 1)
+                        if len(parts) > 1:
+                            root_cause = parts[1].strip().strip("'\"")
+                            break
+                
+                # If no structured output, use first non-empty line
+                if root_cause == "unknown_root_cause":
+                    for line in completion.strip().split("\n"):
+                        if line.strip():
+                            root_cause = line.strip()[:100]
+                            break
+                
+                action = {
+                    "tool_name": "diagnose",
+                    "arguments": {
+                        "root_cause": root_cause,
+                        "confidence": rng.uniform(0.5, 0.95),
+                        "evidence": [],
+                        "alternative_hypotheses": [],
+                    },
+                }
+                _obs, reward, _done, _info = env.step(action)
+                rewards.append(float(reward))
+            except Exception:
+                rewards.append(0.0)
+        return rewards
+    
+    return siege_reward_func
 
 
 def setup_unsloth_model(config: GRPOTrainingConfig) -> tuple[Any, Any]:
@@ -221,14 +269,20 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
         seed=config.seed,
     )
     
-    # 2. Format for training
-    formatted_data = [format_trajectory_for_training(t) for t in trajectories]
-    rewards = [d["reward"] for d in formatted_data]
+    # 2. Format for training dataset
+    from datasets import Dataset
     
-    # 3. Load model
+    formatted_data = [format_trajectory_for_training(t) for t in trajectories]
+    train_dataset = Dataset.from_list(formatted_data)
+    rewards = [t["total_reward"] for t in trajectories]
+    
+    # 3. Build reward function
+    reward_func = build_siege_reward_func(seed=config.seed, max_steps=config.max_env_steps)
+    
+    # 4. Load model
     model, tokenizer = setup_unsloth_model(config)
     
-    # 4. Setup W&B
+    # 5. Setup W&B
     wandb_run_url = None
     if config.log_to_wandb and HAS_WANDB:
         wandb.init(
@@ -238,7 +292,7 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
         )
         wandb_run_url = wandb.run.url if wandb.run else None
     
-    # 5. Configure GRPO trainer (TRL/Unsloth APIs can differ across versions)
+    # 6. Configure GRPO trainer (TRL/Unsloth APIs can differ across versions)
     grpo_kwargs: dict[str, Any] = {
         "output_dir": str(output_dir),
         "num_train_epochs": config.num_train_epochs,
@@ -250,6 +304,7 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
         "num_mini_batches": config.num_mini_batches,
         "logging_steps": 10,
         "save_steps": 50,
+        "max_completion_length": config.max_trajectory_length,
         "report_to": ["wandb"] if (config.log_to_wandb and HAS_WANDB) else [],
         "seed": config.seed,
     }
@@ -262,25 +317,34 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
 
     training_config = GRPOConfig(**filtered_grpo_kwargs)
     
-    # 6. Create trainer
-    trainer = GRPOTrainer(
-        model=model,
-        tokenizer=tokenizer,
-        args=training_config,
-        train_dataset=formatted_data,  # List of {"prompt": ..., "reward": ...}
-    )
+    # 7. Create trainer with reward_funcs
+    trainer_kwargs: dict[str, Any] = {
+        "model": model,
+        "args": training_config,
+        "train_dataset": train_dataset,
+        "reward_funcs": reward_func,
+    }
     
-    # 7. Train
+    # Add tokenizer/processing_class based on TRL version
+    trainer_init_params = set(inspect.signature(GRPOTrainer.__init__).parameters.keys())
+    if "processing_class" in trainer_init_params:
+        trainer_kwargs["processing_class"] = tokenizer
+    elif "tokenizer" in trainer_init_params:
+        trainer_kwargs["tokenizer"] = tokenizer
+    
+    trainer = GRPOTrainer(**trainer_kwargs)
+    
+    # 8. Train
     logger.info("Starting GRPO training...")
     train_result = trainer.train()
     
-    # 8. Save artifacts
+    # 9. Save artifacts
     final_model_path = output_dir / "final_model"
     model.save_pretrained(str(final_model_path))
     tokenizer.save_pretrained(str(final_model_path))
     logger.info(f"✓ Model saved to {final_model_path}")
     
-    # 9. Metrics
+    # 10. Metrics
     duration = (datetime.now(UTC) - start_time).total_seconds()
     best_reward = max(rewards)
     mean_reward = sum(rewards) / len(rewards) if rewards else 0.0
