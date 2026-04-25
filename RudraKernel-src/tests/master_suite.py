@@ -25,4 +25,5 @@ from tests.step_tests.step_21_replay_determinism_test import *  # noqa: F401,F40
 from tests.step_tests.step_22_heldout_ablation_test import *  # noqa: F401,F403
 from tests.step_tests.step_23_wandb_plots_test import *  # noqa: F401,F403
 from tests.step_tests.step_24_gradio_demo_test import *  # noqa: F401,F403
+from tests.step_tests.step_25_grpo_training_test import *  # noqa: F401,F403
 from tests.unit.test_openenv_api import *  # noqa: F401,F403

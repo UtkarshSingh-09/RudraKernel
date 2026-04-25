@@ -1,14 +1,17 @@
 # CURRENT CONTEXT
 
-- Updated: 2026-04-25T12:00:00Z
-- Latest batch: Remediation + Lint/Format/Type cleanup pass
-- Steps 0-24: ALL COMPLETE ✅
-- Master suite: **150 passed, 2 skipped** (exit 0)
+- Updated: 2026-04-25T16:10:00Z
+- Latest batch: Step 25 GRPO training scaffold + gate tests
+- Steps 0-25: ALL COMPLETE ✅
+- Master suite: **152 passed, 2 skipped** (exit 0)
 - Ruff check: **PASS** (0 violations)
 - Ruff format: **PASS** (84 files clean)
 - Mypy: **72 pre-existing errors** (step-append pattern — NOT introduced this session)
 
 ## What's Working
+- Step 25 training scaffold is live: `training/grpo_train.py`
+- Step 25 gate test is live: `tests/step_tests/step_25_grpo_training_test.py` (2/2 PASS)
+- Mini-run contract satisfied: 50-episode training run writes checkpoint + metrics artifacts
 - All 24 steps implemented and gate-tested
 - OpenEnv API: `/env/reset`, `/env/step`, `/env/state`, `/health` all live
 - `siege_env/client.py` (`SIEGEEnv`) importable with no hard deps
@@ -20,7 +23,6 @@
 - IMPLEMENTATION_PLAN.md: Section 12 (Hackathon Addendum) merged from 4 official morning docs
 
 ## What's Next (Phase C)
-- Step 25: GRPO Training Script (Unsloth/TRL) — Utkarsh lead + Ankit
 - Step 26: HF Space Deployment — Ankit lead + Utkarsh
 - Step 27: Docs/Video/Pitch finalization — Both
 

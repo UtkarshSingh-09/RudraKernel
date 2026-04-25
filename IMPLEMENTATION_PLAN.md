@@ -472,7 +472,7 @@ This split is engineered so every phase exits at a **handoff-safe checkpoint** �
 | **B — Parallel** | 22 Held-out + ablation | Utkarsh | Ankit | Parallel |
 | **B — Parallel** | 23 W&B | Ankit | Utkarsh | Parallel |
 | **B — Parallel** | 24 Gradio demo | Ankit | Utkarsh | Parallel |
-| **C — Together** | 25 GRPO training | Utkarsh (lead) + Ankit | Both | Joint |
+| **C — Together** | 25 GRPO training | Utkarsh (solo override) | Self-review | Solo (temporary override) |
 | **C — Together** | 26 HF deploy | Ankit (lead) + Utkarsh | Both | Joint |
 | **C — Together** | 27 Docs/video/pitch | Both | — | Joint |
 
@@ -762,9 +762,10 @@ Next person (or you next session) starts with:
 - Demo trajectories pre-recorded and reviewed by both engineers
 
 #### Step 25 — GRPO Training Script (Unsloth/TRL)
-**Owner:** Utkarsh (lead) + Ankit | **Phase:** C — joint
+**Owner:** Utkarsh (solo override; Ankit unavailable) | **Phase:** C — solo (temporary override)
 - Colab notebook + standalone script
 - Connects to SIEGEEnv, trains, logs to W&B
+**Execution note:** All Step 25 responsibilities are temporarily consolidated under Utkarsh for this cycle.
 **Gate test:** 50-episode mini-run completes, shows non-zero gradient signal, produces checkpoint
 
 #### Step 26 — HF Space Deployment

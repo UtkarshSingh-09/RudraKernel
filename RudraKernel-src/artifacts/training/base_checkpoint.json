@@ -1,0 +1,7 @@
+{
+  "run_name": "base",
+  "seed": 42,
+  "episodes": 50,
+  "non_zero_gradient_signal": true,
+  "timestamp": "2026-04-25T06:16:05.466167+00:00"
+}

@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 2026-04-25T16:10:00Z — Step 25: GRPO Training Script (Solo)
+**Owner:** Utkarsh | **Reviewer:** Self
+**Gate test:** PASS (2/2) — `tests/step_tests/step_25_grpo_training_test.py`
+**Master suite:** PASS (152 passed, 2 skipped) — exit 0
+
+**Files added:**
+- `training/grpo_train.py`
+- `tests/step_tests/step_25_grpo_training_test.py`
+
+**Files modified:**
+- `tests/master_suite.py` (includes Step 25 gate test)
+- `brain/CONTEXT.md`
+- `brain/ROADMAP_STATUS.md`
+- `brain/HANDOFF.md`
+
+**Deliverable notes:**
+- Added local-first Step 25 training harness with plan-aligned pre-training sequence
+- Default mini-run uses 50 episodes and emits checkpoint + metrics JSON artifacts
+- CLI entrypoint available: `python -m training.grpo_train --episodes 50`
+
 ## 2026-04-25T12:00:00Z — Remediation + Lint Cleanup Batch
 **Owner:** Utkarsh (AI-assisted) | **Reviewer:** Utkarsh
 **Scope:** Post-Steps-0-24 remediation pass + lint/format/type cleanup
