@@ -32,7 +32,10 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir \
     "unsloth @ git+https://github.com/unslothai/unsloth.git"
 
+# Force Python to flush stdout/stderr immediately (critical for HF Spaces logs)
+ENV PYTHONUNBUFFERED=1
+
 # Training entrypoint — uses a100_grpo.yaml config
 # HF_TOKEN is read from Space secrets (set in Space settings)
-CMD ["python", "-m", "training.grpo_train_unsloth", \
+CMD ["python", "-u", "-m", "training.grpo_train_unsloth", \
      "--config", "training/configs/a100_grpo.yaml"]
