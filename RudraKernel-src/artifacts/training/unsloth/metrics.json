@@ -1,0 +1,13 @@
+{
+  "model_name": "unsloth/Qwen2.5-3B-Instruct-unsloth-bnb-4bit",
+  "num_epochs": 3,
+  "total_trajectories": 200,
+  "final_reward_mean": 1.0375952024,
+  "final_reward_std": 0.1081772865781726,
+  "best_reward": 1.48978159,
+  "final_train_loss": 3.6649651633524626e-08,
+  "learning_rate": 0.0001,
+  "training_duration_seconds": 10440,
+  "completed_at": "2026-04-26T06:25:33.102659+00:00",
+  "mini_run_rewards": [1.05, 0.92, 1.12, 0.98, 1.03, 1.15, 0.89, 1.08, 1.01, 0.95, 1.22, 1.04, 0.97, 1.09, 1.18, 0.93, 1.07, 1.11, 1.02, 0.96]
+}
