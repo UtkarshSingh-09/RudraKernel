@@ -1,0 +1,9 @@
+name: siege_env
+version: 0.1.0
+description: SIEGE environment scaffold for OpenEnv India 2026
+runtime:
+  framework: fastapi
+  entrypoint: siege_env.server.app:app
+  healthcheck: /health
+environment:
+  python: "3.10"
