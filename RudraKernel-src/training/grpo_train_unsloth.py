@@ -432,22 +432,39 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     
     # 10. Push to HF Hub (critical for ephemeral HF Spaces storage)
     hf_token = os.environ.get("HF_TOKEN", "")
+    print(f"\n{'='*60}", flush=True)
+    print(f"  HUB PUSH STATUS", flush=True)
+    print(f"  hub_model_id: {config.hub_model_id}", flush=True)
+    print(f"  HF_TOKEN present: {bool(hf_token)}", flush=True)
+    print(f"{'='*60}", flush=True)
+    
     if config.hub_model_id and hf_token:
         try:
-            from huggingface_hub import login as hf_login
-            hf_login(token=hf_token)
-            logger.info(f"Pushing model to HF Hub: {config.hub_model_id}")
-            model.push_to_hub(
-                config.hub_model_id,
-                tokenizer=tokenizer,
+            from huggingface_hub import HfApi
+            api = HfApi(token=hf_token)
+            
+            # Create repo if it doesn't exist
+            api.create_repo(
+                repo_id=config.hub_model_id,
                 private=True,
+                exist_ok=True,
             )
-            tokenizer.push_to_hub(config.hub_model_id, private=True)
+            print(f"  ✓ Repo created/verified: {config.hub_model_id}", flush=True)
+            
+            # Upload the saved model directory
+            api.upload_folder(
+                folder_path=str(final_model_path),
+                repo_id=config.hub_model_id,
+                commit_message="GRPO trained SIEGE LoRA adapter",
+            )
+            print(f"  ✓ Model uploaded to https://huggingface.co/{config.hub_model_id}", flush=True)
             logger.info(f"✓ Model pushed to https://huggingface.co/{config.hub_model_id}")
         except Exception as hub_exc:
+            print(f"  ✗ PUSH FAILED: {hub_exc}", flush=True)
             logger.error(f"Failed to push to Hub: {hub_exc}")
             logger.error("Model is saved locally — push manually if needed.")
     elif config.hub_model_id and not hf_token:
+        print("  ✗ HF_TOKEN env var is MISSING — cannot push!", flush=True)
         logger.warning("hub_model_id is set but HF_TOKEN env var is missing — skipping Hub push.")
         logger.warning("Set HF_TOKEN as a Space secret to auto-push after training.")
     
