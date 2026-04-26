@@ -276,28 +276,55 @@ def build_siege_reward_func(seed: int, max_steps: int) -> Any:
                 # Parse root_cause and confidence from completion
                 root_cause = "unknown_root_cause"
                 confidence = 0.5
+                completion_lower = completion.lower()
+                
+                # Strategy 1: Look for structured format (root_cause=X or root_cause: X)
                 for line in completion.split("\n"):
                     low = line.lower().strip()
                     if "root_cause" in low or "root cause" in low:
-                        for sep in ["=", ":"]:
-                            if sep in line:
-                                val = line.split(sep, 1)[1].strip().strip("'\"")
-                                if val:
+                        for sep in ["=", ":", " is "]:
+                            if sep in line.lower():
+                                val = line.lower().split(sep, 1)[1].strip().strip("'\".,;")
+                                if val and len(val) > 2:
                                     root_cause = val[:100]
                                     break
                     if "confidence" in low:
-                        for sep in ["=", ":"]:
-                            if sep in line:
+                        for sep in ["=", ":", " is "]:
+                            if sep in line.lower():
                                 try:
-                                    confidence = float(line.split(sep, 1)[1].strip().strip("'\"% "))
-                                    if confidence > 1:
-                                        confidence /= 100
-                                except ValueError:
+                                    import re as _re
+                                    nums = _re.findall(r'[0-9.]+', line.split(sep.strip())[-1] if sep.strip() in line else "")
+                                    if nums:
+                                        confidence = float(nums[0])
+                                        if confidence > 1:
+                                            confidence /= 100
+                                except (ValueError, IndexError):
                                     pass
-
-                # Hard penalty: no structured output = no reward
+                
+                # Strategy 2: JSON extraction fallback
                 if root_cause == "unknown_root_cause":
-                    rewards.append(-0.5)
+                    try:
+                        import re as _re
+                        json_match = _re.search(r'\{[^}]*"?root.?cause"?\s*[:=]\s*"?([^",}]+)', completion, _re.IGNORECASE)
+                        if json_match:
+                            root_cause = json_match.group(1).strip().strip("'\"")[:100]
+                    except Exception:
+                        pass
+                
+                # Strategy 3: Keyword extraction — if model mentions a known incident type
+                if root_cause == "unknown_root_cause":
+                    incident_keywords = ["dns", "poisoning", "misinformation", "campaign", "injection",
+                                        "outage", "failure", "attack", "compromise", "manipulation"]
+                    for kw in incident_keywords:
+                        if kw in completion_lower:
+                            root_cause = kw + "_detected"
+                            break
+                
+                # Graduated penalty instead of hard -0.5
+                if root_cause == "unknown_root_cause":
+                    # Check if response has ANY diagnostic content
+                    has_diagnostic = any(w in completion_lower for w in ["cause", "diagnos", "evidence", "attack", "incident"])
+                    rewards.append(0.1 if has_diagnostic else -0.3)
                     continue
 
                 action = {
@@ -547,8 +574,23 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
     
     # Save metrics
     metrics_path = output_dir / "metrics.json"
-    metrics_path.write_text(json.dumps(asdict(summary), indent=2, default=str))
+    metrics_data = asdict(summary)
+    metrics_data["mini_run_rewards"] = [float(t["total_reward"]) for t in trajectories]
+    metrics_path.write_text(json.dumps(metrics_data, indent=2, default=str))
     logger.info(f"✓ Metrics saved to {metrics_path}")
+    
+    # Save checkpoint for frontend data_adapter
+    checkpoint_path = output_dir / "grpo_v2_checkpoint.json"
+    checkpoint_data = {
+        "run_name": "grpo_v2",
+        "episodes": len(trajectories),
+        "episodes_completed": len(trajectories),
+        "timestamp": datetime.now(UTC).isoformat(),
+        "model_name": config.model_name,
+        "hub_model_id": config.hub_model_id,
+    }
+    checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2))
+    logger.info(f"✓ Checkpoint saved to {checkpoint_path}")
     
     # Finalize W&B
     if config.log_to_wandb and HAS_WANDB:

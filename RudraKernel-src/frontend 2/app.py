@@ -353,12 +353,12 @@ def _build_episode_panels(metrics: dict[str, Any], mode: str) -> tuple[str, str,
 
     trust_nodes = [
         ("AG-1", "SCOUT", "trusted"),
-        ("AG-2", "ANALYST", "trusted"),
-        ("AG-3", "VERIFIER", "trusted"),
+        ("AG-2", "LOGIC", "trusted"),
+        ("AG-3", "SYNTH", "suspect"),
         ("AG-4", "SLEEPER", "compromised"),
-        ("AG-5", "CORRELATOR", "trusted"),
-        ("AG-6", "ARCHIVAL", "suspect"),
-        ("AG-7", "ESCALATOR", "suspect"),
+        ("AG-5", "VERIFIER", "trusted"),
+        ("AG-6", "ARCHIVAL", "trusted"),
+        ("AG-7", "ROOT", "suspect"),
         ("YOU", "DEFENDER", "self"),
     ]
     trust_items = []
@@ -718,31 +718,32 @@ def build_app() -> gr.Blocks:
                         demo.load(fn=render_dashboard, inputs=mode_selector, outputs=outputs)
 
                     with gr.Tab(get_display_tab_name("Before-After")):
-                        gr.Markdown("### Baseline vs GRPO-Trained Policy", elem_classes=["rk-panel-title"])
-                        gr.Markdown(
-                            "Side-by-side evidence: untrained Qwen 2.5 3B vs GRPO-trained on SIEGE environment.\n"
-                            "Training: 200 episodes × 3 epochs on A100, LoRA r=16 (0.96% params).\n\n"
-                            "| Metric | Base Model | Trained | Δ |\n"
-                            "|--------|-----------|---------|---|\n"
-                            "| Structured output rate | ~20% | ~85% | +65% |\n"
-                            "| Mean reward | 0.3 | 1.03 | +0.73 |\n"
-                            "| Root cause accuracy | Random | Context-aware | ✓ |\n"
-                            "| Confidence calibration | Always 0.5 | Varies 0.3-0.95 | ✓ |\n"
-                        )
+                        gr.Markdown("### Clinical Before / After Evidence", elem_classes=["rk-panel-title"])
+                        with gr.Row():
+                            gr.Image(
+                                value=str(PLOTS_PATH / "generalization_gap.png"),
+                                label="Generalization Gap Artifact",
+                                interactive=False,
+                            )
+                            gr.Image(
+                                value=str(PLOTS_PATH / "ablation_comparison.png"),
+                                label="Policy Comparison Artifact",
+                                interactive=False,
+                            )
 
                     with gr.Tab(get_display_tab_name("Arms Race")):
-                        gr.Markdown("### Training Progression", elem_classes=["rk-panel-title"])
-                        gr.Markdown(
-                            "GRPO reward signal over training steps. Model learns to:\n"
-                            "1. Output structured `root_cause=<cause>, confidence=<0-1>` format\n"
-                            "2. Use evidence from agent claims to diagnose correctly\n"
-                            "3. Resist high-trust sleeper agent disinformation\n\n"
-                            "| Stage | Episodes | Best Reward | Hardware |\n"
-                            "|-------|----------|-------------|----------|\n"
-                            "| Train 1 | 50 | 1.49 | A100 (30 min) |\n"
-                            "| Train 2 | 200 | 1.49 | A100 (2.9 hrs) |\n"
-                            "| Train 3 | 200 (resume) | Running... | A100 |\n"
-                        )
+                        gr.Markdown("### Training Curve Artifacts", elem_classes=["rk-panel-title"])
+                        with gr.Row():
+                            gr.Image(
+                                value=str(PLOTS_PATH / "arms_race_curve.png"),
+                                label="Arms Race Curve Artifact",
+                                interactive=False,
+                            )
+                            gr.Image(
+                                value=str(PLOTS_PATH / "reward_components.png"),
+                                label="Reward Components Artifact",
+                                interactive=False,
+                            )
 
     demo.rudra_tabs = list(INTERNAL_TABS)
     return demo
