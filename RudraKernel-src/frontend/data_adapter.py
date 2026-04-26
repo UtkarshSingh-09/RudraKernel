@@ -57,10 +57,14 @@ def _ts_sort_value(timestamp: str) -> datetime:
 
 def list_completed_runs(training_dir: Path) -> list[RunSnapshot]:
     runs: list[RunSnapshot] = []
-    for checkpoint_path in sorted(training_dir.glob("*_checkpoint.json")):
+    for checkpoint_path in sorted(training_dir.glob("**/*_checkpoint.json")):
         checkpoint = _read_json(checkpoint_path)
         run_name = str(checkpoint.get("run_name") or checkpoint_path.stem.replace("_checkpoint", ""))
-        metrics_path = training_dir / f"{run_name}_metrics.json"
+        # Look for metrics in same directory as checkpoint
+        checkpoint_dir = checkpoint_path.parent
+        metrics_path = checkpoint_dir / f"{run_name}_metrics.json"
+        if not metrics_path.exists():
+            metrics_path = checkpoint_dir / "metrics.json"
         if not metrics_path.exists():
             metrics_path = training_dir / "metrics.json"
         metrics = _read_json(metrics_path)
