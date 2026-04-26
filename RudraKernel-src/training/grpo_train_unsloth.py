@@ -101,6 +101,9 @@ class GRPOTrainingConfig:
     # HF Hub — push trained LoRA after training
     hub_model_id: str = "ankit-choubey/siege-grpo-lora"
     
+    # Resume from previously trained LoRA (empty = train from scratch)
+    resume_from_lora: str = ""
+    
     # Environment
     seed: int = 42
     max_env_steps: int = 10
@@ -321,27 +324,30 @@ def setup_unsloth_model(config: GRPOTrainingConfig) -> tuple[Any, Any]:
     if not HAS_UNSLOTH:
         raise ImportError("Unsloth not installed. Run: pip install unsloth")
     
-    logger.info(f"Loading {config.model_name} with Unsloth...")
+    load_name = config.resume_from_lora if config.resume_from_lora else config.model_name
+    logger.info(f"Loading model: {load_name}")
     
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=config.model_name,
+        model_name=load_name,
         max_seq_length=config.max_seq_length,
         dtype=torch.float16,
         load_in_4bit=config.load_in_4bit,
     )
     
-    # Attach LoRA adapters (required for training quantized models)
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=16,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                        "gate_proj", "up_proj", "down_proj"],
-        lora_alpha=16,
-        lora_dropout=0,
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=42,
-    )
+    if not config.resume_from_lora:
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=16,
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                            "gate_proj", "up_proj", "down_proj"],
+            lora_alpha=16,
+            lora_dropout=0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=42,
+        )
+    else:
+        logger.info(f"✓ Resuming from LoRA: {config.resume_from_lora}")
     
     # Prepare for training
     model = FastLanguageModel.for_training(model)
@@ -403,6 +409,10 @@ def run_grpo_training(config: GRPOTrainingConfig) -> GRPOTrainingSummary:
         "max_completion_length": config.max_trajectory_length,
         "report_to": ["wandb"] if (config.log_to_wandb and HAS_WANDB) else [],
         "seed": config.seed,
+        # GRPO-specific: more completions = better advantage estimation
+        "num_generations": 8,
+        # Higher temp = more diverse completions = sharper reward differences
+        "temperature": 0.9,
     }
 
     supported_grpo_args = set(inspect.signature(GRPOConfig.__init__).parameters.keys())
