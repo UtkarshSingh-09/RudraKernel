@@ -1,0 +1,26 @@
+model_name: unsloth/Qwen2.5-3B-Instruct-unsloth-bnb-4bit
+max_seq_length: 1024
+load_in_4bit: true
+
+num_train_epochs: 3
+num_mini_batches: 4
+learning_rate: 1.0e-4
+weight_decay: 0.01
+warmup_ratio: 0.05
+
+trajectory_episodes: 50
+max_trajectory_length: 256
+
+# A100 80GB
+gradient_accumulation_steps: 4
+per_device_train_batch_size: 4
+
+log_to_wandb: false
+wandb_project: rudra-kernel-grpo
+output_dir: artifacts/training/unsloth
+
+# Push to separate repo — Train 2 (backup) stays untouched
+hub_model_id: UtkarshSingh09/siege-grpo-lora-50ep
+
+seed: 42
+max_env_steps: 10

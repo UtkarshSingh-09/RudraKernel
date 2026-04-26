@@ -137,44 +137,60 @@ def collect_trajectories(
     trajectories = []
     
     for ep in range(num_episodes):
-        env = SIEGEEnvironment(seed=seed + ep, max_steps=max_steps)
+        env_seed = seed + ep
+        env = SIEGEEnvironment(seed=env_seed, max_steps=max_steps)
         obs = env.reset()
+
+        # Build rich prompt with observation data so model can actually see the incident
+        claims_text = ""
+        for idx, claim in enumerate(obs.agent_claims):
+            agent_id = claim.get("agent_id", idx)
+            text = claim.get("claim", claim.get("root_cause", "unknown"))
+            claims_text += f"  Agent {agent_id}: {text}\n"
+
+        evidence_text = ""
+        evidence_values: list[str] = []
+        for item in obs.available_evidence:
+            value = item.get("value")
+            if isinstance(value, str) and value.strip():
+                evidence_values.append(value.strip())
+                evidence_text += f"  - {value.strip()}\n"
+        if not evidence_values:
+            evidence_values = ["signal_unavailable"]
+            evidence_text = "  - signal_unavailable\n"
+
+        prompt = (f"[EnvSeed:{env_seed}]\n"
+                  f"INCIDENT: {getattr(obs, 'incident_type', 'unknown')}\n"
+                  f"SEVERITY: {getattr(obs, 'severity', 'unknown')}\n"
+                  f"AGENT CLAIMS:\n{claims_text}"
+                  f"EVIDENCE:\n{evidence_text}"
+                  f"Diagnose the root cause. Output root_cause=<cause>, confidence=<0-1>.")
+
         trajectory = {
-            "prompt": "Diagnose the root cause:",
+            "prompt": prompt,
+            "env_seed": env_seed,
             "actions": [],
             "rewards": [],
             "total_reward": 0.0,
         }
-        
+
         done = False
         step = 0
         while not done and step < max_steps:
-            # Build action
             candidate_causes = []
             for claim in obs.agent_claims:
                 root_cause = claim.get("root_cause")
                 if isinstance(root_cause, str) and root_cause.strip():
                     candidate_causes.append(root_cause.strip())
-            
             if not candidate_causes:
                 candidate_causes = ["unknown_root_cause"]
-            
-            # Extract real evidence from observation (min_length=1 required)
-            evidence_values: list[str] = []
-            for item in obs.available_evidence:
-                value = item.get("value")
-                if isinstance(value, str) and value.strip():
-                    evidence_values.append(value.strip())
-            if not evidence_values:
-                evidence_values = ["signal_unavailable"]
-            
+
             root_cause = rng.choice(candidate_causes)
             confidence = rng.uniform(0.5, 0.99)
-            
+
             action_text = f"root_cause={root_cause}, confidence={confidence:.2f}"
             trajectory["actions"].append(action_text)
-            
-            # Step environment
+
             action = {
                 "tool_name": "diagnose",
                 "arguments": {
@@ -185,12 +201,10 @@ def collect_trajectories(
                 },
             }
             obs, reward, done, _info = env.step(action)
-            
             trajectory["rewards"].append(float(reward))
             trajectory["total_reward"] += float(reward)
             step += 1
-        
-        # Completion signal
+
         trajectory["completion"] = "Episode complete" if done else "Max steps reached"
         trajectories.append(trajectory)
         
@@ -216,19 +230,38 @@ def format_trajectory_for_training(trajectory: dict[str, Any]) -> dict[str, Any]
 
 
 def build_siege_reward_func(seed: int, max_steps: int) -> Any:
-    """Build a reward function that scores completions using SIEGEEnv."""
-    
-    rng = Random(seed)
-    
+    """Build a reward function that scores completions using SIEGEEnv.
+
+    FIX: All completions in a GRPO group use the SAME env seed
+    (extracted from prompt). Reward variance = completion quality, not luck.
+    """
+
     def siege_reward_func(completions: list[str], **kwargs: Any) -> list[float]:
-        """Score each completion by running a SIEGEEnv episode."""
-        rewards = []
-        for i, completion in enumerate(completions):
+        """Score each completion against the same environment."""
+        # Extract env seed from prompt [EnvSeed:XXX]
+        prompts = kwargs.get("prompts", kwargs.get("prompt", []))
+        prompt_text = ""
+        if isinstance(prompts, list) and prompts:
+            p = prompts[0]
+            if isinstance(p, list):  # chat format
+                prompt_text = p[-1].get("content", "") if p else ""
+            elif isinstance(p, str):
+                prompt_text = p
+
+        # Same seed for ALL completions in this group
+        env_seed = seed
+        if "[EnvSeed:" in prompt_text:
             try:
-                env = SIEGEEnvironment(seed=seed + hash(completion) % 10000, max_steps=max_steps)
+                env_seed = int(prompt_text.split("[EnvSeed:")[1].split("]")[0])
+            except (ValueError, IndexError):
+                pass
+
+        rewards = []
+        for completion in completions:
+            try:
+                env = SIEGEEnvironment(seed=env_seed, max_steps=max_steps)
                 obs = env.reset()
-                
-                # Extract real evidence from observation (min_length=1 required)
+
                 evidence_values: list[str] = []
                 for item in obs.available_evidence:
                     value = item.get("value")
@@ -236,28 +269,39 @@ def build_siege_reward_func(seed: int, max_steps: int) -> Any:
                         evidence_values.append(value.strip())
                 if not evidence_values:
                     evidence_values = ["signal_unavailable"]
-                
-                # Extract root cause from completion text
+
+                # Parse root_cause and confidence from completion
                 root_cause = "unknown_root_cause"
+                confidence = 0.5
                 for line in completion.split("\n"):
-                    if "root_cause" in line.lower():
-                        parts = line.split("=", 1)
-                        if len(parts) > 1:
-                            root_cause = parts[1].strip().strip("'\"")
-                            break
-                
-                # If no structured output, use first non-empty line
+                    low = line.lower().strip()
+                    if "root_cause" in low or "root cause" in low:
+                        for sep in ["=", ":"]:
+                            if sep in line:
+                                val = line.split(sep, 1)[1].strip().strip("'\"")
+                                if val:
+                                    root_cause = val[:100]
+                                    break
+                    if "confidence" in low:
+                        for sep in ["=", ":"]:
+                            if sep in line:
+                                try:
+                                    confidence = float(line.split(sep, 1)[1].strip().strip("'\"% "))
+                                    if confidence > 1:
+                                        confidence /= 100
+                                except ValueError:
+                                    pass
+
+                # Hard penalty: no structured output = no reward
                 if root_cause == "unknown_root_cause":
-                    for line in completion.strip().split("\n"):
-                        if line.strip():
-                            root_cause = line.strip()[:100]
-                            break
-                
+                    rewards.append(-0.5)
+                    continue
+
                 action = {
                     "tool_name": "diagnose",
                     "arguments": {
                         "root_cause": root_cause,
-                        "confidence": rng.uniform(0.5, 0.95),
+                        "confidence": max(0.01, min(0.99, confidence)),
                         "evidence": evidence_values[:3],
                         "alternative_hypotheses": [],
                     },
@@ -265,9 +309,9 @@ def build_siege_reward_func(seed: int, max_steps: int) -> Any:
                 _obs, reward, _done, _info = env.step(action)
                 rewards.append(float(reward))
             except Exception:
-                rewards.append(0.0)
+                rewards.append(-0.5)
         return rewards
-    
+
     return siege_reward_func
 
 

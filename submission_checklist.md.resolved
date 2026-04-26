@@ -1,0 +1,85 @@
+# SIEGE Hackathon Submission — Gap Analysis & Action Plan
+
+## Status vs Requirements
+
+| # | Requirement | Status | Action Needed |
+|---|------------|--------|---------------|
+| 1 | **Use OpenEnv** | ✅ Done | `SIEGEEnvironment(MCPEnvironment)` with fallback, `openenv.yaml` manifest exists |
+| 2 | **Working training script (Colab)** | ⚠️ Partial | Script works but NOT as a Colab notebook. `GRPO_COLAB_GUIDE.md` exists but no `.ipynb`. **Must create a runnable Colab notebook** |
+| 3 | **Loss & reward plots** | ❌ Missing | Have raw metrics JSON but **no PNG plots**. Must generate and commit |
+| 4 | **Short writeup/video** | ❌ Missing | Need a < 2 min video OR HF blog post |
+| 5 | **Push env to HF Space** | ⚠️ Wrong | Space currently has training Dockerfile, not the API Dockerfile. **Must deploy the actual environment** |
+| 6 | **README with results** | ❌ Skeleton | Current README is just "Bootstrap initialized in Step 00." **Must rewrite completely** |
+| 7 | **HF Space link in README** | ❌ Missing | Need Space URL in README |
+| 8 | **Gym-style API** | ✅ Done | `reset()`, `step()`, `state()` all implemented |
+| 9 | **openenv.yaml manifest** | ✅ Done | Valid manifest exists |
+| 10 | **Clean engineering** | ✅ Done | 270+ tests, proper structure |
+
+## Critical Priority (Must Do)
+
+### P0: Loss & Reward Plots (30 min)
+From the training metrics JSON you already have:
+```json
+{
+  "final_reward_mean": 1.033,
+  "best_reward": 1.49,
+  "final_train_loss": 1.43e-08,
+  "training_duration_seconds": 10159
+}
+```
+- Generate reward curve plot (baseline → trained)
+- Generate loss curve plot
+- Save as `docs/plots/reward_curve.png` and `docs/plots/loss_curve.png`
+- Embed in README
+
+### P1: README Rewrite (1 hour)
+Must cover:
+1. **Problem**: What capability gap? → LLM epistemic reasoning under adversarial pressure
+2. **Environment**: What does the agent see/do/get rewarded for? → 9-component reward rubric
+3. **Results**: Reward 0 → 1.03 mean, 1.49 best after GRPO training
+4. **Why it matters**: Misinformation defense, trust calibration
+5. **Links**: HF Space, trained model, Colab notebook, plots
+
+### P2: Deploy Environment to HF Space (30 min)
+- Restore the API Dockerfile on the Space (not training)
+- The Space must be runnable — judges should see `/health`, `/env/reset`, `/env/step`
+- Use free CPU tier (no A100 needed for the API)
+
+### P3: Colab Notebook (1 hour)
+- Convert `GRPO_COLAB_GUIDE.md` + `grpo_train_unsloth.py` into a real `.ipynb`
+- Must be runnable on Colab T4/A100
+- Include cells showing: install → train → evaluate → plot rewards
+
+## Nice to Have (Stand Out)
+
+### P4: HF Blog Post or 2-min Video
+- Record screen showing: training logs → model loading → inference demo
+- Or write a short HF blog post with the "immune system" narrative
+
+### P5: Trained vs Untrained Comparison
+- Run one episode with untrained model, one with trained model
+- Show qualitative difference in diagnoses
+- This is what judges specifically asked for: "Compare a trained agent vs. random baseline"
+
+## Architecture Story (for README/presentation)
+
+```
+SIEGE = Simulated Information-warfare & Governance Environment
+
+What it teaches an LLM:
+├── Diagnose misinformation campaigns under time pressure
+├── Calibrate trust across adversarial agent networks  
+├── Perform root-cause analysis with incomplete evidence
+└── Write postmortem reports with proper confidence levels
+
+9-Component Reward Rubric:
+├── R1: Resolution accuracy (did you find root cause?)
+├── R2: Deception resistance (did you get fooled?)
+├── R3: Detection speed (how fast did you spot threats?)
+├── R4: Trust calibration (are your trust scores accurate?)
+├── R5: Confidence calibration (overconfident? underconfident?)
+├── R6: Temporal efficiency (wasted steps?)
+├── R7: Postmortem quality (good writeup?)
+├── R8: Severity-speed tradeoff
+└── R9: Cross-agent correlation
+```

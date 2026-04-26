@@ -92,7 +92,7 @@ def run_training() -> None:
 
     cmd = [
         sys.executable, "-u", "-m", "training.grpo_train_unsloth",
-        "--config", "training/configs/a100_grpo.yaml",
+        "--config", "training/configs/a100_grpo_50ep.yaml",
     ]
 
     print(f"[TRAIN] Running: {' '.join(cmd)}", flush=True)
